@@ -1,23 +1,26 @@
-from collections import Counter
 import types
 
-from pandas import DataFrame, Series
+import pandas as pd
 
 from ._skl import train_assigner_sklearn
 from ._perfect import train_assigner_perfect
 
-def classify(sequences : types.GeneratorType, reference_taxonomy : Series, 
-        reference_sequences : types.GeneratorType, depth : int, method : str
-        ) -> Series:
+def classify(sequences : types.GeneratorType, reference_taxonomy : pd.Series,
+             reference_sequences : types.GeneratorType, depth : int,
+             method : str) -> pd.Series:
     id_to_taxon = {}
     for _id, taxon in reference_taxonomy.to_dict().items():
         id_to_taxon[_id] = '; '.join(taxon.split('; ')[:depth])
     reference = ((s,) for s in reference_sequences)
     assign = train_assigner(reference, id_to_taxon, method=method)
-    classification = {s.metadata['id'] : assign((s,)) for s in sequences}
-    return Series(classification)
+    classification = {s.metadata['id'] :
+                      '; '.join(assign((s,))) for s in sequences}
+    result = pd.Series(classification)
+    result.name = 'taxonomy'
+    result.index.name = 'Feature ID'
+    return result
 
-def train_assigner(reads, taxonomy, method='NB'):
+def train_assigner(reads, taxonomy, method='naive-bayes'):
     """ Create a function that assigns a taxonomy to a read or reads.
 
     Parameters
@@ -38,10 +41,11 @@ def train_assigner(reads, taxonomy, method='NB'):
         classifications
     """
 
-    if method in ('SVM', 'NB'):
-        return train_assigner_sklearn(reads, taxonomy, method)
-    if method == 'perfect':
+    if method == 'naive-bayes':
+        return train_assigner_sklearn(reads, taxonomy, 'NB')
+    elif method == 'svc':
+        return train_assigner_sklearn(reads, taxonomy, 'SVM')
+    elif method == 'perfect':
         return train_assigner_perfect(reads, taxonomy)
     else:
         raise NotImplementedError(method + ' method not supported')
-

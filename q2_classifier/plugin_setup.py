@@ -1,4 +1,4 @@
-from qiime.plugin import Plugin, Int, Properties, Str
+from qiime.plugin import Plugin, Int, Properties, Str, Choices
 
 import q2_classifier
 from q2_types import (
@@ -14,11 +14,12 @@ plugin = Plugin(
 
 plugin.methods.register_function(
     function=q2_classifier.classify,
-    inputs={'sequences' : FeatureData[Sequence], 
+    inputs={'sequences' : FeatureData[Sequence],
         'reference_sequences' : ReferenceFeatures[SSU],
         'reference_taxonomy' : ReferenceFeatures[SSU]},
-    parameters={'depth': Int, 'method' : Str},
+    parameters={'depth': Int,
+                'method' : Str % Choices(['naive-bayes', 'svc', 'perfect'])},
     outputs=[('classification', FeatureData[Taxonomy])],
-    name='classify from scratch',
-    description='fit a classifier to a reference then classify some sequences'
+    name='Train and apply feature classifier.',
+    description='Train a classifier and apply it to feature data.'
 )
