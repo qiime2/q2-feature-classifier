@@ -1,9 +1,0 @@
-provenance:
-  artifact-uuids: {reference_sequences: 7f290959-0f92-436d-84cb-451592f0b3ef, reference_taxonomy: 7f290959-0f92-436d-84cb-451592f0b3ef,
-    sequences: 9aca8a33-1685-4626-8449-53dfb011f349}
-  execution-uuid: 0f3e5f45-5a6a-4dc0-9a8d-23f77349bc89
-  executor-reference: classify. Details on plugin, version, website, etc. will also
-    be included, see https://github.com/biocore/qiime2/issues/26
-  parameter-references: {depth: '3', method: NB}
-type: FeatureData[Taxonomy]
-uuid: 48d951e0-f025-42ac-bc2f-43987ec7d7f6
