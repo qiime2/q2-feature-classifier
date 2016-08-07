@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="q2-classifier",
+    name="q2-feature-classifier",
     version='0.0.0-dev',
     packages=find_packages(),
     install_requires=['biom-format >= 2.1.5, < 2.2.0',
@@ -11,9 +11,9 @@ setup(
     author_email="kaehler@gmail.com",
     description="Functionality for taxonomic classification",
     license='BSD-3-Clause',
-    url="https://github.com/BenKaehler/q2-classifier",
+    url="https://github.com/BenKaehler/q2-feature-classifier",
     entry_points={
         'qiime.plugins':
-        ['q2-classifier=q2_classifier.plugin_setup:plugin']
+        ['q2-feature-classifier=q2_feature_classifier.plugin_setup:plugin']
     }
 )
