@@ -1,3 +1,11 @@
+# ----------------------------------------------------------------------------
+# Copyright (c) 2016--, Ben Kaehler
+#
+# Distributed under the terms of the Modified BSD License.
+#
+# The full license is in the file LICENSE, distributed with this software.
+# ----------------------------------------------------------------------------
+
 import types
 
 import pandas as pd
@@ -6,8 +14,8 @@ from ._skl import train_assigner_sklearn
 from ._perfect import train_assigner_perfect
 
 def classify(sequences : types.GeneratorType, reference_taxonomy : pd.Series,
-             reference_sequences : types.GeneratorType, depth : int,
-             method : str) -> pd.Series:
+        reference_sequences : types.GeneratorType, method : str,
+        depth : int = 4) -> pd.Series:
     id_to_taxon = {}
     for _id, taxon in reference_taxonomy.to_dict().items():
         id_to_taxon[_id] = '; '.join(taxon.split('; ')[:depth])
