@@ -13,20 +13,22 @@ import pandas as pd
 from ._skl import train_assigner_sklearn
 from ._perfect import train_assigner_perfect
 
-def classify(sequences : types.GeneratorType, reference_taxonomy : pd.Series,
-        reference_sequences : types.GeneratorType, method : str,
-        depth : int = 4) -> pd.Series:
+
+def classify(sequences: types.GeneratorType, reference_taxonomy: pd.Series,
+             reference_sequences: types.GeneratorType, method: str,
+             depth: int = 4) -> pd.Series:
     id_to_taxon = {}
     for _id, taxon in reference_taxonomy.to_dict().items():
         id_to_taxon[_id] = '; '.join(taxon.split('; ')[:depth])
     reference = ((s,) for s in reference_sequences)
     assign = train_assigner(reference, id_to_taxon, method=method)
-    classification = {s.metadata['id'] :
+    classification = {s.metadata['id']:
                       '; '.join(assign((s,))) for s in sequences}
     result = pd.Series(classification)
     result.name = 'taxonomy'
     result.index.name = 'Feature ID'
     return result
+
 
 def train_assigner(reads, taxonomy, method='naive-bayes'):
     """ Create a function that assigns a taxonomy to a read or reads.

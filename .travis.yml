@@ -1,0 +1,23 @@
+sudo: false
+language: python
+env:
+  - PYTHON_VERSION=3.5
+before_install:
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+  - chmod +x miniconda.sh
+  - ./miniconda.sh -b
+  - export PATH=/home/travis/miniconda3/bin:$PATH
+install:
+  # TODO some of the dependencies here aren't directly required by this
+  # package. For now, install them this way for faster build times. Ultimately
+  # we can let conda do dependency resolution when there are conda packages for
+  # the various QIIME 2 projects. Until then, avoid installing heavyweight
+  # dependencies via pip.
+  - conda create --yes -n test-env -c biocore python=$PYTHON_VERSION scikit-bio jupyter click nose flake8 scikit-learn
+  - source activate test-env
+  - pip install https://github.com/qiime2/qiime2/archive/master.zip
+  - pip install https://github.com/qiime2/q2-types/archive/master.zip
+  - pip install .
+script:
+  - nosetests
+  - flake8 q2_feature_classifier setup.py

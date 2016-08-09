@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=['biom-format >= 2.1.5, < 2.2.0',
                       'qiime >= 2.0.0', 'q2-types', 'scikit-bio',
-                      'scikit-learn',],
+                      'scikit-learn'],
     author="Ben Kaehler",
     author_email="kaehler@gmail.com",
     description="Functionality for taxonomic classification",
