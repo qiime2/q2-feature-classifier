@@ -6,20 +6,17 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-import json
-
 import skbio
-from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction import DictVectorizer
-from sklearn.feature_selection import SelectPercentile
-from sklearn.svm import SVC
-from sklearn.naive_bayes import MultinomialNB
 
 _specific_fitters = [
-        ('naive_bayes', [('s', SelectPercentile()), ('c', MultinomialNB())]),
-        ('svc', [('s', SelectPercentile()),
-                 ('c', SVC(C=10, kernel='linear', degree=3, gamma=0.001))])
-        ]
+    ['svc', {'steps': [
+     ['transform', 'sklearn.feature_selection.SelectPercentile'],
+     ['classify', 'sklearn.svm.SVC']],
+     'classify': {'C': 10, 'kernel': 'linear', 'degree': 3, 'gamma': 0.001}}],
+    ['naive_bayes', {'steps': [
+     ['transform', 'sklearn.feature_selection.SelectPercentile'],
+     ['classify', 'sklearn.naive_bayes.MultinomialNB']]}]]
 
 
 def _extract_features(reads, word_length):
@@ -51,13 +48,12 @@ def _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput):
     return labels
 
 
-def fit_pipeline(reads, taxonomy, spec, word_length, taxonomy_separator=None,
-                 taxonomy_depth=None, multioutput=False):
+def fit_pipeline(reads, taxonomy, pipeline, word_length=8,
+                 taxonomy_separator=None, taxonomy_depth=None,
+                 multioutput=False):
     seq_ids, X = _extract_features(reads, word_length)
     y = [taxonomy.get(s, 'unknown') for s in seq_ids]
     y = _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput)
-    pipeline = Pipeline(steps=spec['steps'])
-    pipeline.set_params(**spec)
     pipeline.fit(X, y)
     return pipeline
 
@@ -69,6 +65,3 @@ def predict(reads, pipeline, word_length=None, taxonomy_separator=None,
     if multioutput:
         y = [taxonomy_separator.join(t) for t in y]
     return seq_ids, y
-
-
-

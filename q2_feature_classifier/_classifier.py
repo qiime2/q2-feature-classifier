@@ -9,6 +9,8 @@
 import types
 import json
 import importlib
+import inspect
+import copy
 
 import pandas as pd
 from qiime.plugin import Int, Str, Float
@@ -21,21 +23,26 @@ from ._taxonomic_classifier import TaxonomicClassifier
 from .plugin_setup import plugin
 
 
-def as_pipeline_params(json):
-    if '__sklearn_class__' in json:
-        module = importlib.import_module(json['module'])
-        return getattr(module, json['class'])()
-    return json
+def _load_class(classname):
+    module, klass = classname.rsplit('.', 1)
+    module = importlib.import_module(module)
+    return getattr(module, klass)
+
+
+def _pipeline_from_spec(spec):
+    steps = [(s, _load_class(c)(**spec.get(s, {}))) for s, c in spec['steps']]
+    return Pipeline(steps)
 
 
 def fit_classifier(reference_reads: types.GeneratorType,
                    reference_taxonomy: pd.Series,
                    classifier_specification: str, word_length: int=8
                    ) -> dict:
-    spec = json.loads(classifier_specification, object_hook=as_pipeline_params)
+    spec = json.loads(classifier_specification)
+    pipeline = _pipeline_from_spec(spec)
     params = {'word_length': word_length}
     pipeline = fit_pipeline(reference_reads, reference_taxonomy,
-                            spec, **params)
+                            pipeline, **params)
     return {'params': params, 'pipeline': pipeline}
 
 plugin.methods.register_function(
@@ -89,45 +96,35 @@ plugin.methods.register_function(
     description='Classify reads by taxon using a fitted classifier.',
 )
 
-class PipelineParamEncoder(json.JSONEncoder):
-    def default(self, obj):
-        try:
-            return super().default(obj)
-        except TypeError:
-            if hasattr(obj, 'tolist'):
-                return self.default(obj.tolist())
-            else:
-                print(obj)
-                return {'module': obj.__module__,
-                        'class': obj.__class__.__name__,
-                        '__sklearn_class__': True}
 
-def _register_fitter(name, steps):
-    pipeline = Pipeline(steps)
-    prefix = steps[-1][0] + '__'
+def _register_fitter(name, spec):
+    type_map = {int: Int, float: Float}  # add bool when available
     annotations = {}
     parameters = {}
-
-    type_map = {int: Int, float: Float}  # EEE add bool when it arrives
-    spec = pipeline.get_params()
-    for param, value in spec.items():
-        if not param.startswith(prefix) or callable(value):  # ignore functions
+    class_name = spec['steps'][-1][1]
+    signature = inspect.signature(_load_class(class_name))
+    for param_name, param in signature.parameters.items():
+        if callable(param.default):  # callable introduces too many issues
             continue
-        param = param[len(prefix):]
-        parameters[param] = type_map.get(type(value), Str)
-        annotations[param] = type(value) if type(value) in type_map else str
+        d_type = type(param.default)
+        parameters[param_name] = type_map.get(d_type, Str)
+        annotations[param_name] = d_type if d_type in type_map else str
 
     def _generic_fitter(reference_reads: types.GeneratorType,
                         reference_taxonomy: pd.Series,
                         word_length: int=8, **kwargs) -> dict:
-        for param, value in kwargs.items():  # EEE needs work
+        this_spec = copy.deepcopy(spec)
+        for param in kwargs:
             try:
-                spec[prefix + param] = json.loads(value)
+                kwargs[param] = json.loads(kwargs[param])
             except (json.JSONDecodeError, TypeError):
-                spec[prefix + param] = value
-        flat_spec = json.dumps(spec, cls=PipelineParamEncoder)
-        return fit_classifier(reference_reads, reference_taxonomy, flat_spec,
-                              word_length=word_length)
+                pass
+        this_spec[spec['steps'][-1][0]] = kwargs
+        pipeline = _pipeline_from_spec(this_spec)
+        params = {'word_length': word_length}
+        pipeline = fit_pipeline(reference_reads, reference_taxonomy,
+                                pipeline, **params)
+        return {'params': params, 'pipeline': pipeline}
 
     parameters.update({'word_length': Int})
     _generic_fitter.__annotations__.update(annotations)
@@ -138,12 +135,8 @@ def _register_fitter(name, steps):
                 'reference_taxonomy': ReferenceFeatures[SSU]},
         parameters=parameters,
         outputs=[('classifier', TaxonomicClassifier)],
-        name='Train the scikit-learn ' + \
-             spec['steps'][-1][1].__class__.__name__ + \
-             ' classifier.',
-        description='Create a ' + \
-                    spec['steps'][-1][1].__class__.__name__ + \
-                    ' classifier for reads'
+        name='Train the ' + class_name + ' classifier.',
+        description='Create a ' + class_name + ' classifier for reads'
     )
     _generic_fitter.__name__ = 'fit_classifier_' + name + '_paired_end'
     plugin.methods.register_function(
@@ -152,11 +145,8 @@ def _register_fitter(name, steps):
                 'reference_taxonomy': ReferenceFeatures[SSU]},
         parameters=parameters,
         outputs=[('classifier', TaxonomicClassifier)],
-        name='Train the scikit-learn ' + \
-             spec['steps'][-1][1].__class__.__name__ + \
-             ' classifier.',
-        description='Create a ' + \
-                    spec['steps'][-1][1].__class__.__name__ + \
+        name='Train the ' + class_name + ' classifier.',
+        description='Create a ' + class_name +
                     ' classifier for paired-end reads'
     )
 
