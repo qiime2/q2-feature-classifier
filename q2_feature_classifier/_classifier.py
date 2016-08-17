@@ -7,90 +7,158 @@
 # ----------------------------------------------------------------------------
 
 import types
+import json
+import importlib
 
 import pandas as pd
-from qiime.plugin import Int, Str, Choices
+from qiime.plugin import Int, Str, Float
 from q2_types import (ReferenceFeatures, SSU, FeatureData, Taxonomy, Sequence,
                       PairedEndSequence)
+from sklearn.pipeline import Pipeline
 
-from ._skl import train_assigner_sklearn
-from ._perfect import train_assigner_perfect
+from ._skl import fit_pipeline, predict, _specific_fitters
+from ._taxonomic_classifier import TaxonomicClassifier
 from .plugin_setup import plugin
 
 
-def classify(sequences: types.GeneratorType, reference_taxonomy: pd.Series,
-             reference_sequences: types.GeneratorType, method: str
-             ) -> pd.Series:
-    reference = ((s,) for s in reference_sequences)
-    assign = train_assigner(reference, reference_taxonomy, method=method)
-    classification = {s.metadata['id']: assign((s,)) for s in sequences}
-    result = pd.Series(classification)
+def as_pipeline_params(json):
+    if '__sklearn_class__' in json:
+        module = importlib.import_module(json['module'])
+        return getattr(module, json['class'])()
+    return json
+
+
+def fit_classifier(reference_reads: types.GeneratorType,
+                   reference_taxonomy: pd.Series,
+                   classifier_specification: str, word_length: int=8
+                   ) -> dict:
+    spec = json.loads(classifier_specification, object_hook=as_pipeline_params)
+    params = {'word_length': word_length}
+    pipeline = fit_pipeline(reference_reads, reference_taxonomy,
+                            spec, **params)
+    return {'params': params, 'pipeline': pipeline}
+
+plugin.methods.register_function(
+    function=fit_classifier,
+    inputs={'reference_reads': FeatureData[Sequence],
+            'reference_taxonomy': ReferenceFeatures[SSU]},
+    parameters={'classifier_specification': Str, 'word_length': Int},
+    outputs=[('taxonomic_classifier', TaxonomicClassifier)],
+    name='Train a scikit-learn classifier.',
+    description='Train a scikit-learn classifier to classify reads.'
+)
+
+fit_classifier.__name__ = 'fit_classifier_paired_end'
+plugin.methods.register_function(
+    function=fit_classifier,
+    inputs={'reference_reads': FeatureData[PairedEndSequence],
+            'reference_taxonomy': ReferenceFeatures[SSU]},
+    parameters={'classifier_specification': Str, 'word_length': Int},
+    outputs=[('classifier', TaxonomicClassifier)],
+    name='Train a scikit-learn classifier.',
+    description='Train a scikit-learn classifier to classify paired end reads.'
+)
+
+
+def classify(reads: types.GeneratorType, classifier: dict) -> pd.Series:
+    seq_ids, classifications = predict(reads, classifier['pipeline'],
+                                       **classifier['params'])
+    result = pd.Series(classifications, index=seq_ids)
     result.name = 'taxonomy'
     result.index.name = 'Feature ID'
     return result
 
 plugin.methods.register_function(
     function=classify,
-    inputs={'sequences': FeatureData[Sequence],
-            'reference_sequences': ReferenceFeatures[SSU],
-            'reference_taxonomy': ReferenceFeatures[SSU]},
-    parameters={'method': Str % Choices(['naive-bayes', 'svc', 'perfect'])},
+    inputs={'reads': FeatureData[Sequence],
+            'classifier': TaxonomicClassifier},
+    parameters={},
     outputs=[('classification', FeatureData[Taxonomy])],
-    name='Train and apply feature classifier.',
-    description='Train a classifier and apply it to feature data.'
+    name='Classify reads by taxon.',
+    description='Classify reads by taxon using a fitted classifier.',
 )
 
-
-def classify_paired_end(pairs: types.GeneratorType,
-                        reference_taxonomy: pd.Series,
-                        reference_sequences: types.GeneratorType, method: str
-                        ) -> pd.Series:
-    assign = train_assigner(reference_sequences, reference_taxonomy,
-                            method=method)
-    classification = {s[0].metadata['id']: assign(s) for s in pairs}
-    result = pd.Series(classification)
-    result.name = 'taxonomy'
-    result.index.name = 'Feature ID'
-    return result
-
+classify.__name__ = 'classify_paired_end'
 plugin.methods.register_function(
-    function=classify_paired_end,
-    inputs={'pairs': FeatureData[PairedEndSequence],
-            'reference_sequences': FeatureData[PairedEndSequence],
-            'reference_taxonomy': ReferenceFeatures[SSU]},
-    parameters={'method': Str % Choices(['naive-bayes', 'svc', 'perfect'])},
+    function=classify,
+    inputs={'reads': FeatureData[PairedEndSequence],
+            'classifier': TaxonomicClassifier},
+    parameters={},
     outputs=[('classification', FeatureData[Taxonomy])],
-    name='Train and apply feature classifier for paired-end data.',
-    description='Train a classifier and apply it to paired-end feature data.'
+    name='Classify reads by taxon.',
+    description='Classify reads by taxon using a fitted classifier.',
 )
 
+class PipelineParamEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            return super().default(obj)
+        except TypeError:
+            if hasattr(obj, 'tolist'):
+                return self.default(obj.tolist())
+            else:
+                print(obj)
+                return {'module': obj.__module__,
+                        'class': obj.__class__.__name__,
+                        '__sklearn_class__': True}
 
-def train_assigner(reads, taxonomy, method='naive-bayes'):
-    """ Create a function that assigns a taxonomy to a read or reads.
+def _register_fitter(name, steps):
+    pipeline = Pipeline(steps)
+    prefix = steps[-1][0] + '__'
+    annotations = {}
+    parameters = {}
 
-    Parameters
-    ----------
-    reads : list
-        list of single or pairs of skbio.sequence.DNA reads
-    taxonomy : dict
-        mapping from taxon id to taxonomic classification
-    method : str, optional
-        method to use for assignment. 'perfect' uses an inverse dict for
-        perfect recall. Can return multiple classifications per read. 'SVM' to
-        use sklearn.svm.SVC. 'NB' to use sklearn.naive_bays.MultinomialNB.
+    type_map = {int: Int, float: Float}  # EEE add bool when it arrives
+    spec = pipeline.get_params()
+    for param, value in spec.items():
+        if not param.startswith(prefix) or callable(value):  # ignore functions
+            continue
+        param = param[len(prefix):]
+        parameters[param] = type_map.get(type(value), Str)
+        annotations[param] = type(value) if type(value) in type_map else str
 
-    Returns
-    -------
-    callable
-        function that takes a read or read pair and returns a list of
-        classifications
-    """
+    def _generic_fitter(reference_reads: types.GeneratorType,
+                        reference_taxonomy: pd.Series,
+                        word_length: int=8, **kwargs) -> dict:
+        for param, value in kwargs.items():  # EEE needs work
+            try:
+                spec[prefix + param] = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                spec[prefix + param] = value
+        flat_spec = json.dumps(spec, cls=PipelineParamEncoder)
+        return fit_classifier(reference_reads, reference_taxonomy, flat_spec,
+                              word_length=word_length)
 
-    if method == 'naive-bayes':
-        return train_assigner_sklearn(reads, taxonomy, 'NB')
-    elif method == 'svc':
-        return train_assigner_sklearn(reads, taxonomy, 'SVM')
-    elif method == 'perfect':
-        return train_assigner_perfect(reads, taxonomy)
-    else:
-        raise NotImplementedError(method + ' method not supported')
+    parameters.update({'word_length': Int})
+    _generic_fitter.__annotations__.update(annotations)
+    _generic_fitter.__name__ = 'fit_classifier_' + name
+    plugin.methods.register_function(
+        function=_generic_fitter,
+        inputs={'reference_reads': FeatureData[Sequence],
+                'reference_taxonomy': ReferenceFeatures[SSU]},
+        parameters=parameters,
+        outputs=[('classifier', TaxonomicClassifier)],
+        name='Train the scikit-learn ' + \
+             spec['steps'][-1][1].__class__.__name__ + \
+             ' classifier.',
+        description='Create a ' + \
+                    spec['steps'][-1][1].__class__.__name__ + \
+                    ' classifier for reads'
+    )
+    _generic_fitter.__name__ = 'fit_classifier_' + name + '_paired_end'
+    plugin.methods.register_function(
+        function=_generic_fitter,
+        inputs={'reference_reads': FeatureData[PairedEndSequence],
+                'reference_taxonomy': ReferenceFeatures[SSU]},
+        parameters=parameters,
+        outputs=[('classifier', TaxonomicClassifier)],
+        name='Train the scikit-learn ' + \
+             spec['steps'][-1][1].__class__.__name__ + \
+             ' classifier.',
+        description='Create a ' + \
+                    spec['steps'][-1][1].__class__.__name__ + \
+                    ' classifier for paired-end reads'
+    )
+
+for name, pipeline in _specific_fitters:
+    _register_fitter(name, pipeline)

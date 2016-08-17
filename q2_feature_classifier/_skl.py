@@ -6,77 +6,69 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-from collections import Counter
+import json
 
+import skbio
+from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_selection import SelectPercentile
 from sklearn.svm import SVC
 from sklearn.naive_bayes import MultinomialNB
 
-
-def _kmer_dist(pair, word_length=8):
-    """Combine the kmer_frequencies of a pair of sequences
-
-    Parameters
-    ----------
-    pair : tuple
-        a tuple of skbio.sequence.DNA sequences
-    word_lenth : int
-        kmer lengths
-
-    Returns
-    -------
-    dict
-        mapping from kmer to count
-    """
-    kmer_counts = Counter()
-    for read in pair:
-        if len(read) < word_length:
-            continue
-        freqs = read.kmer_frequencies(word_length)
-        for kmer in freqs:
-            kmer_counts[kmer] += freqs[kmer]
-    return kmer_counts
+_specific_fitters = [
+        ('naive_bayes', [('s', SelectPercentile()), ('c', MultinomialNB())]),
+        ('svc', [('s', SelectPercentile()),
+                 ('c', SVC(C=10, kernel='linear', degree=3, gamma=0.001))])
+        ]
 
 
-def train_assigner_sklearn(reads, taxonomy, method='SVM'):
-    """Manufacture a function to classify read pairs.
+def _extract_features(reads, word_length):
+    seq_ids = []
+    counts = []
+    for read in reads:
+        if isinstance(read, skbio.DNA):
+            seq_ids.append(read.metadata['id'])
+            counts.append(read.kmer_frequencies(word_length))
+        else:
+            seq_ids.append(read[0].metadata['id'])
+            count = {w+l: c for l, r in zip('lr', read)
+                     for w, c in r.kmer_frequencies(word_length).items()}
+            counts.append(count)
+    vectoriser = DictVectorizer()
+    return seq_ids, vectoriser.fit_transform(counts)
 
-    Currently uses sklearn.svm.SVC. Will extend to provide
-    other classifiers as time allows.
 
-    Parameters
-    ----------
-    reads : list
-        list of pairs of skbio.sequence.DNA reads
-    taxonomy : dict
-        mapping from taxon ids to taxonomic classifications
+def _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput):
+    labels = []
+    for label in y:
+        if taxonomy_separator is not None:
+            label = label.split(taxonomy_separator)
+            if taxonomy_depth is not None:
+                label = label[:taxonomy_depth]
+            if not multioutput:
+                label = taxonomy_separator.join(label)
+        labels.append(label)
+    return labels
 
-    Returns
-    -------
-    callable
-        function which takes a read pair and returns a classification
-    """
-    kmer_counts = {}
-    for pair in reads:
-        kmer_counts[pair[0].metadata['id']] = _kmer_dist(pair)
-    seq_ids, kmer_counts = zip(*kmer_counts.items())
-    vectorizer = DictVectorizer()
-    X = vectorizer.fit_transform(kmer_counts)
-    y = [taxonomy.get(seq_id, 'unknown') for seq_id in seq_ids]
-    selector = SelectPercentile()
-    X = selector.fit_transform(X, y)
 
-    if method == 'SVM':
-        classifier = SVC(C=10, kernel='linear', degree=3,
-                         gamma=0.001).fit(X, y)
-    elif method == 'NB':
-        classifier = MultinomialNB().fit(X, y)
-    else:
-        raise ValueError(method + ' method not supported')
+def fit_pipeline(reads, taxonomy, spec, word_length, taxonomy_separator=None,
+                 taxonomy_depth=None, multioutput=False):
+    seq_ids, X = _extract_features(reads, word_length)
+    y = [taxonomy.get(s, 'unknown') for s in seq_ids]
+    y = _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput)
+    pipeline = Pipeline(steps=spec['steps'])
+    pipeline.set_params(**spec)
+    pipeline.fit(X, y)
+    return pipeline
 
-    def assign(pair):
-        kmer_counts = _kmer_dist(pair)
-        x = selector.transform(vectorizer.transform(kmer_counts))
-        return (classifier.predict(x)[0],)
-    return assign
+
+def predict(reads, pipeline, word_length=None, taxonomy_separator=None,
+            taxonomy_depth=None, multioutput=False):
+    seq_ids, X = _extract_features(reads, word_length)
+    y = pipeline.predict(X)
+    if multioutput:
+        y = [taxonomy_separator.join(t) for t in y]
+    return seq_ids, y
+
+
+
