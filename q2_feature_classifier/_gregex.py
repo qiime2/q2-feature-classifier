@@ -1,3 +1,11 @@
+# ----------------------------------------------------------------------------
+# Copyright (c) 2016--, Ben Kaehler
+#
+# Distributed under the terms of the Modified BSD License.
+#
+# The full license is in the file LICENSE, distributed with this software.
+# ----------------------------------------------------------------------------
+
 from itertools import chain
 from numpy import empty, percentile
 from skbio import DNA
