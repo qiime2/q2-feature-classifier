@@ -13,7 +13,7 @@ import inspect
 import copy
 
 import pandas as pd
-from qiime.plugin import Int, Str, Float
+from qiime.plugin import Int, Str, Float, Bool
 from q2_types import (ReferenceFeatures, SSU, FeatureData, Taxonomy, Sequence,
                       PairedEndSequence)
 from sklearn.pipeline import Pipeline
@@ -36,20 +36,27 @@ def _pipeline_from_spec(spec):
 
 def fit_classifier(reference_reads: types.GeneratorType,
                    reference_taxonomy: pd.Series,
-                   classifier_specification: str, word_length: int=8
-                   ) -> dict:
+                   classifier_specification: str, word_length: int=8,
+                   taxonomy_separator: str=None, taxonomy_depth: int=None,
+                   multioutput: bool=False) -> dict:
     spec = json.loads(classifier_specification)
     pipeline = _pipeline_from_spec(spec)
-    params = {'word_length': word_length}
+    params = {'word_length': word_length,
+              'taxonomy_separator': taxonomy_separator,
+              'taxonomy_depth': taxonomy_depth,
+              'multioutput': multioutput}
     pipeline = fit_pipeline(reference_reads, reference_taxonomy,
                             pipeline, **params)
     return {'params': params, 'pipeline': pipeline}
+
+_fitter_parameters = {'word_length': Int, 'taxonomy_separator': Str,
+                      'taxonomy_depth': Int, 'multioutput': Bool}
 
 plugin.methods.register_function(
     function=fit_classifier,
     inputs={'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': ReferenceFeatures[SSU]},
-    parameters={'classifier_specification': Str, 'word_length': Int},
+    parameters={**{'classifier_specification': Str}, **_fitter_parameters},
     outputs=[('taxonomic_classifier', TaxonomicClassifier)],
     name='Train a scikit-learn classifier.',
     description='Train a scikit-learn classifier to classify reads.'
@@ -60,7 +67,7 @@ plugin.methods.register_function(
     function=fit_classifier,
     inputs={'reference_reads': FeatureData[PairedEndSequence],
             'reference_taxonomy': ReferenceFeatures[SSU]},
-    parameters={'classifier_specification': Str, 'word_length': Int},
+    parameters={**{'classifier_specification': Str}, **_fitter_parameters},
     outputs=[('classifier', TaxonomicClassifier)],
     name='Train a scikit-learn classifier.',
     description='Train a scikit-learn classifier to classify paired end reads.'
@@ -98,7 +105,7 @@ plugin.methods.register_function(
 
 
 def _register_fitter(name, spec):
-    type_map = {int: Int, float: Float}  # add bool when available
+    type_map = {int: Int, float: Float, bool: Bool}
     annotations = {}
     parameters = {}
     class_name = spec['steps'][-1][1]
@@ -112,7 +119,9 @@ def _register_fitter(name, spec):
 
     def _generic_fitter(reference_reads: types.GeneratorType,
                         reference_taxonomy: pd.Series,
-                        word_length: int=8, **kwargs) -> dict:
+                        word_length: int=8, taxonomy_separator: str=None,
+                        taxonomy_depth: int=None, multioutput: bool=False,
+                        **kwargs) -> dict:
         this_spec = copy.deepcopy(spec)
         for param in kwargs:
             try:
@@ -121,12 +130,15 @@ def _register_fitter(name, spec):
                 pass
         this_spec[spec['steps'][-1][0]] = kwargs
         pipeline = _pipeline_from_spec(this_spec)
-        params = {'word_length': word_length}
+        params = {'word_length': word_length,
+                  'taxonomy_separator': taxonomy_separator,
+                  'taxonomy_depth': taxonomy_depth,
+                  'multioutput': multioutput}
         pipeline = fit_pipeline(reference_reads, reference_taxonomy,
                                 pipeline, **params)
         return {'params': params, 'pipeline': pipeline}
 
-    parameters.update({'word_length': Int})
+    parameters.update(_fitter_parameters)
     _generic_fitter.__annotations__.update(annotations)
     _generic_fitter.__name__ = 'fit_classifier_' + name
     plugin.methods.register_function(
