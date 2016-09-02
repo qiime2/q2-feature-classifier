@@ -84,11 +84,11 @@ class ClassifierTests(unittest.TestCase):
             taxonomy = Artifact.load(join(self.data_dir, '85_ref_feat.qza'))
             classifier_spec = json.dumps(spec)
             gen_classifier = gen_fitter(reads, taxonomy, classifier_spec,
-                                        taxonomy_depth=7, 
+                                        taxonomy_depth=7,
                                         taxonomy_separator='; ')
             gen_classification = classify(reads, gen_classifier)
             gc = gen_classification.view(pd.Series).to_dict()
-            spec_fitter = getattr(feature_classifier.methods, 
+            spec_fitter = getattr(feature_classifier.methods,
                                   'fit_classifier_' + name)
             class_name = spec['steps'][-1][1]
             params = spec.get(spec['steps'][-1][0], {})
@@ -117,11 +117,11 @@ class ClassifierTests(unittest.TestCase):
             taxonomy = Artifact.load(join(self.data_dir, '85_ref_feat.qza'))
             classifier_spec = json.dumps(spec)
             gen_classifier = gen_fitter(reads, taxonomy, classifier_spec,
-                                        taxonomy_depth=7, 
+                                        taxonomy_depth=7,
                                         taxonomy_separator='; ')
             gen_classification = classify(reads, gen_classifier)
             gc = gen_classification.view(pd.Series).to_dict()
-            spec_fitter = getattr(feature_classifier.methods, 
+            spec_fitter = getattr(feature_classifier.methods,
                                   'fit_classifier_' + name + '_paired_end')
             class_name = spec['steps'][-1][1]
             params = spec.get(spec['steps'][-1][0], {})
