@@ -37,7 +37,7 @@ def _pipeline_from_spec(spec):
 def fit_classifier(reference_reads: types.GeneratorType,
                    reference_taxonomy: pd.Series,
                    classifier_specification: str, word_length: int=8,
-                   taxonomy_separator: str=None, taxonomy_depth: int=None,
+                   taxonomy_separator: str='', taxonomy_depth: int=-1,
                    multioutput: bool=False) -> dict:
     spec = json.loads(classifier_specification)
     pipeline = _pipeline_from_spec(spec)
@@ -105,23 +105,29 @@ plugin.methods.register_function(
 
 
 def _register_fitter(name, spec):
-    type_map = {int: Int, float: Float, bool: Bool}
-    annotations = {}
+    type_map = {int: Int, float: Float, bool: Bool, str: Str}
     parameters = {}
+    signature_params = []
     class_name = spec['steps'][-1][1]
+    defaults = spec[spec['steps'][-1][0]]
     signature = inspect.signature(_load_class(class_name))
-    for param_name, param in signature.parameters.items():
-        if callable(param.default):  # callable introduces too many issues
+    print(defaults)
+    for param_name, parameter in signature.parameters.items():
+        if callable(parameter.default):  # callable introduces too many issues
             continue
-        d_type = type(param.default)
-        parameters[param_name] = type_map.get(d_type, Str)
-        annotations[param_name] = d_type if d_type in type_map else str
+        default = defaults.get(param_name, parameter.default)
+        annotation = type(default) if type(default) in type_map else str
+        default = json.dumps(default) if annotation is str else default
+        new_param = inspect.Parameter(param_name, parameter.kind,
+                                      default=default, annotation=annotation)
+        parameters[param_name] = type_map.get(annotation, Str)
+        signature_params.append(new_param)
 
-    def _generic_fitter(reference_reads: types.GeneratorType,
-                        reference_taxonomy: pd.Series,
-                        word_length: int=8, taxonomy_separator: str=None,
-                        taxonomy_depth: int=None, multioutput: bool=False,
-                        **kwargs) -> dict:
+    def generic_fitter(reference_reads: types.GeneratorType,
+                       reference_taxonomy: pd.Series,
+                       word_length: int=8, taxonomy_separator: str='',
+                       taxonomy_depth: int=-1, multioutput: bool=False,
+                       **kwargs) -> dict:
         this_spec = copy.deepcopy(spec)
         for param in kwargs:
             try:
@@ -139,10 +145,17 @@ def _register_fitter(name, spec):
         return {'params': params, 'pipeline': pipeline}
 
     parameters.update(_fitter_parameters)
-    _generic_fitter.__annotations__.update(annotations)
-    _generic_fitter.__name__ = 'fit_classifier_' + name
+    generic_signature = inspect.signature(generic_fitter)
+    new_params = list(generic_signature.parameters.values())[:-1]
+    new_params.extend(signature_params)
+    return_annotation = generic_signature.return_annotation
+    new_signature = inspect.Signature(parameters=new_params,
+                                      return_annotation=return_annotation)
+    generic_fitter.__signature__ = new_signature
+
+    generic_fitter.__name__ = 'fit_classifier_' + name
     plugin.methods.register_function(
-        function=_generic_fitter,
+        function=generic_fitter,
         inputs={'reference_reads': FeatureData[Sequence],
                 'reference_taxonomy': ReferenceFeatures[SSU]},
         parameters=parameters,
@@ -150,9 +163,9 @@ def _register_fitter(name, spec):
         name='Train the ' + class_name + ' classifier.',
         description='Create a ' + class_name + ' classifier for reads'
     )
-    _generic_fitter.__name__ = 'fit_classifier_' + name + '_paired_end'
+    generic_fitter.__name__ = 'fit_classifier_' + name + '_paired_end'
     plugin.methods.register_function(
-        function=_generic_fitter,
+        function=generic_fitter,
         inputs={'reference_reads': FeatureData[PairedEndSequence],
                 'reference_taxonomy': ReferenceFeatures[SSU]},
         parameters=parameters,

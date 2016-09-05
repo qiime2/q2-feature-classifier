@@ -15,8 +15,8 @@ _specific_fitters = [
      ['classify', 'sklearn.svm.SVC']],
      'classify': {'C': 10, 'kernel': 'linear', 'degree': 3, 'gamma': 0.001}}],
     ['naive_bayes', {'steps': [
-     ['transform', 'sklearn.feature_selection.SelectPercentile'],
-     ['classify', 'sklearn.naive_bayes.MultinomialNB']]}]]
+     ['classify', 'sklearn.naive_bayes.MultinomialNB']],
+                     'classify': {'alpha': 0.01}}]]
 
 
 def _extract_features(reads, word_length):
@@ -38,9 +38,9 @@ def _extract_features(reads, word_length):
 def _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput):
     labels = []
     for label in y:
-        if taxonomy_separator is not None:
+        if taxonomy_separator != '':
             label = label.split(taxonomy_separator)
-            if taxonomy_depth is not None:
+            if taxonomy_depth > 0:
                 label = label[:taxonomy_depth]
             if not multioutput:
                 label = taxonomy_separator.join(label)
@@ -49,7 +49,7 @@ def _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput):
 
 
 def fit_pipeline(reads, taxonomy, pipeline, word_length=8,
-                 taxonomy_separator=None, taxonomy_depth=None,
+                 taxonomy_separator='', taxonomy_depth=-1,
                  multioutput=False):
     seq_ids, X = _extract_features(reads, word_length)
     y = [taxonomy.get(s, 'unknown') for s in seq_ids]

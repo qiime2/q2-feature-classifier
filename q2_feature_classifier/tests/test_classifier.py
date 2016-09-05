@@ -10,14 +10,12 @@ import unittest
 import os
 import json
 from os.path import join
-import inspect
 
 from qiime.sdk import Artifact
 from qiime.plugins import feature_classifier
 import pandas as pd
 
 from q2_feature_classifier._skl import _specific_fitters
-from q2_feature_classifier._classifier import _load_class
 
 
 class ClassifierTests(unittest.TestCase):
@@ -73,8 +71,6 @@ class ClassifierTests(unittest.TestCase):
             right += ref[taxon].startswith(cls[taxon])
         self.assertGreater(right/len(cls), 0.5)
 
-        pass
-
     def test_fit_specific_classifiers(self):
         # specific and general classifiers should produce the same results
         gen_fitter = feature_classifier.methods.fit_classifier
@@ -90,19 +86,8 @@ class ClassifierTests(unittest.TestCase):
             gc = gen_classification.view(pd.Series).to_dict()
             spec_fitter = getattr(feature_classifier.methods,
                                   'fit_classifier_' + name)
-            class_name = spec['steps'][-1][1]
-            params = spec.get(spec['steps'][-1][0], {})
-            skl_classifier = _load_class(class_name)(**params)
-            params = skl_classifier.get_params()
-            signature = inspect.signature(_load_class(class_name))
-            for param_name, param in signature.parameters.items():
-                if callable(param.default):
-                    del params[param_name]
-                if type(param.default) not in {int, float, bool}:
-                    params[param_name] = json.dumps(params[param_name])
             spec_classifier = spec_fitter(reads, taxonomy, taxonomy_depth=7,
-                                          taxonomy_separator='; ',
-                                          **params)
+                                          taxonomy_separator='; ')
             spec_classification = classify(reads, spec_classifier)
             sc = spec_classification.view(pd.Series).to_dict()
             for taxon in gc:
@@ -123,19 +108,8 @@ class ClassifierTests(unittest.TestCase):
             gc = gen_classification.view(pd.Series).to_dict()
             spec_fitter = getattr(feature_classifier.methods,
                                   'fit_classifier_' + name + '_paired_end')
-            class_name = spec['steps'][-1][1]
-            params = spec.get(spec['steps'][-1][0], {})
-            skl_classifier = _load_class(class_name)(**params)
-            params = skl_classifier.get_params()
-            signature = inspect.signature(_load_class(class_name))
-            for param_name, param in signature.parameters.items():
-                if callable(param.default):
-                    del params[param_name]
-                if type(param.default) not in {int, float, bool}:
-                    params[param_name] = json.dumps(params[param_name])
             spec_classifier = spec_fitter(reads, taxonomy, taxonomy_depth=7,
-                                          taxonomy_separator='; ',
-                                          **params)
+                                          taxonomy_separator='; ')
             spec_classification = classify(reads, spec_classifier)
             sc = spec_classification.view(pd.Series).to_dict()
             for taxon in gc:
