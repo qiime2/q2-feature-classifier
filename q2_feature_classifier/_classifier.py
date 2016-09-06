@@ -111,7 +111,6 @@ def _register_fitter(name, spec):
     class_name = spec['steps'][-1][1]
     defaults = spec[spec['steps'][-1][0]]
     signature = inspect.signature(_load_class(class_name))
-    print(defaults)
     for param_name, parameter in signature.parameters.items():
         if callable(parameter.default):  # callable introduces too many issues
             continue
