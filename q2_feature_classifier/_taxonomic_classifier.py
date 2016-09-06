@@ -55,12 +55,25 @@ plugin.register_data_layout(taxonomic_classifier_data_layout)
 plugin.register_type_to_data_layout(TaxonomicClassifier,
                                     'taxonomic_classifier', 1)
 
+_n_bytes = 2**31
+_max_bytes = _n_bytes - 1
+
 
 def read_classifier(data_dir):
     with open(os.path.join(data_dir, 'preprocess_params.json'), 'r') as fh:
         params = json.load(fh)
-    with open(os.path.join(data_dir, 'sklearn_pipeline.pkl'), 'rb') as fh:
-        pipeline = pickle.load(fh)
+    # Macs can't pickle or unpickle objects larger than ~2GB. See
+    # http://bugs.python.org/issue24658
+    # Thanks for the workaround
+    # http://stackoverflow.com/questions/31468117/python-3-can-pickle-handle-byte-objects-larger-than-4gb # noqa
+    pickle_path = os.path.join(data_dir, 'sklearn_pipeline.pkl')
+    bytes_in = bytearray(0)
+    input_size = os.path.getsize(pickle_path)
+    with open(pickle_path, 'rb') as fh:
+        for _ in range(0, input_size, _max_bytes):
+            bytes_in += fh.read(_max_bytes)
+    pipeline = pickle.loads(bytes_in)
+
     return {'params': params, 'pipeline': pipeline}
 
 
@@ -72,8 +85,12 @@ def write_classifier(view, data_dir):
 
     if 'pipeline' not in view:
         raise ValueError('classifier does not contain pipeline')
+    # See above comment about pickle on macs.
+    bytes_out = pickle.dumps(view['pipeline'])
     with open(os.path.join(data_dir, 'sklearn_pipeline.pkl'), 'wb') as fh:
-        pickle.dump(view['pipeline'], fh)
+        # pickle.dump(view['pipeline'], fh)
+        for idx in range(0, _n_bytes, _max_bytes):
+            fh.write(bytes_out[idx:idx+_max_bytes])
 
 plugin.register_data_layout_reader('taxonomic_classifier', 1, dict,
                                    read_classifier)
