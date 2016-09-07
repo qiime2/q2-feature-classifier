@@ -7,14 +7,15 @@
 # ----------------------------------------------------------------------------
 
 import skbio
-from sklearn.feature_extraction import DictVectorizer
 
 _specific_fitters = [
     ['svc', {'steps': [
+     ['vectorize', 'sklearn.feature_extraction.DictVectorizer'],
      ['transform', 'sklearn.feature_selection.SelectPercentile'],
      ['classify', 'sklearn.svm.SVC']],
      'classify': {'C': 10, 'kernel': 'linear', 'degree': 3, 'gamma': 0.001}}],
     ['naive_bayes', {'steps': [
+     ['vectorize', 'sklearn.feature_extraction.DictVectorizer'],
      ['classify', 'sklearn.naive_bayes.MultinomialNB']],
                      'classify': {'alpha': 0.01}}]]
 
@@ -31,8 +32,7 @@ def _extract_features(reads, word_length):
             count = {w+l: c for l, r in zip('lr', read)
                      for w, c in r.kmer_frequencies(word_length).items()}
             counts.append(count)
-    vectoriser = DictVectorizer()
-    return seq_ids, vectoriser.fit_transform(counts)
+    return seq_ids, counts
 
 
 def _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput):

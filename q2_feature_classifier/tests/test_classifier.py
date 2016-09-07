@@ -26,7 +26,9 @@ class ClassifierTests(unittest.TestCase):
         reads = Artifact.load(join(self.data_dir, '85_ref_pe_reads.qza'))
         taxonomy = Artifact.load(join(self.data_dir, '85_ref_feat.qza'))
         classifier_specification = \
-            {'steps': [['transform',
+            {'steps': [['vectorize',
+                        'sklearn.feature_extraction.DictVectorizer'],
+                       ['transform',
                         'sklearn.feature_selection.SelectPercentile'],
                        ['classify',
                         'sklearn.naive_bayes.MultinomialNB']]}
@@ -51,7 +53,9 @@ class ClassifierTests(unittest.TestCase):
         reads = Artifact.load(join(self.data_dir, '85_ref_se_reads.qza'))
         taxonomy = Artifact.load(join(self.data_dir, '85_ref_feat.qza'))
         classifier_specification = \
-            {'steps': [['transform',
+            {'steps': [['vectorize',
+                        'sklearn.feature_extraction.DictVectorizer'],
+                       ['transform',
                         'sklearn.feature_selection.SelectPercentile'],
                        ['classify',
                         'sklearn.naive_bayes.MultinomialNB']]}
