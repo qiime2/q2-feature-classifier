@@ -21,18 +21,7 @@ _specific_fitters = [
 
 
 def _extract_features(reads, word_length):
-    seq_ids = []
-    counts = []
-    for read in reads:
-        if isinstance(read, skbio.DNA):
-            seq_ids.append(read.metadata['id'])
-            counts.append(read.kmer_frequencies(word_length))
-        else:
-            seq_ids.append(read[0].metadata['id'])
-            count = {w+l: c for l, r in zip('lr', read)
-                     for w, c in r.kmer_frequencies(word_length).items()}
-            counts.append(count)
-    return seq_ids, counts
+    return zip(*[_read_to_counts(read, word_length) for read in reads])
 
 
 def _extract_labels(y, taxonomy_separator, taxonomy_depth, multioutput):
@@ -58,10 +47,25 @@ def fit_pipeline(reads, taxonomy, pipeline, word_length=8,
     return pipeline
 
 
+def _read_to_counts(read, word_length):
+    if isinstance(read, skbio.DNA):
+        return read.metadata['id'], read.kmer_frequencies(word_length)
+    else:
+        return (read[0].metadata['id'],
+                {w+l: c for l, r in zip('lr', read)
+                 for w, c in r.kmer_frequencies(word_length).items()})
+
+
+def _predictor(reads, pipeline, word_length, multioutput, taxonomy_separator):
+    for read in reads:
+        seq_id, X = _read_to_counts(read, word_length)
+        y = pipeline.predict([X])[0]
+        if multioutput:
+            y = taxonomy_separator.join(y)
+        yield seq_id, y
+
+
 def predict(reads, pipeline, word_length=None, taxonomy_separator=None,
             taxonomy_depth=None, multioutput=False):
-    seq_ids, X = _extract_features(reads, word_length)
-    y = pipeline.predict(X)
-    if multioutput:
-        y = [taxonomy_separator.join(t) for t in y]
-    return seq_ids, y
+    return _predictor(reads, pipeline, word_length, multioutput,
+                      taxonomy_separator)

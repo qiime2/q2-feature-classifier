@@ -75,8 +75,9 @@ plugin.methods.register_function(
 
 
 def classify(reads: types.GeneratorType, classifier: dict) -> pd.Series:
-    seq_ids, classifications = predict(reads, classifier['pipeline'],
-                                       **classifier['params'])
+    predictions = predict(reads, classifier['pipeline'],
+                          **classifier['params'])
+    seq_ids, classifications = zip(*predictions)
     result = pd.Series(classifications, index=seq_ids)
     result.name = 'taxonomy'
     result.index.name = 'Feature ID'
