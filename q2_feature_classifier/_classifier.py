@@ -74,7 +74,7 @@ plugin.methods.register_function(
 )
 
 
-def classify(reads: types.GeneratorType, classifier: dict, 
+def classify(reads: types.GeneratorType, classifier: dict,
              chunk_size: int=262144) -> pd.Series:
     predictions = predict(reads, classifier['pipeline'],
                           **classifier['params'])
