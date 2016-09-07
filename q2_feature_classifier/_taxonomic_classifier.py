@@ -67,11 +67,11 @@ def read_classifier(data_dir):
     # Thanks for the workaround
     # http://stackoverflow.com/questions/31468117/python-3-can-pickle-handle-byte-objects-larger-than-4gb # noqa
     pickle_path = os.path.join(data_dir, 'sklearn_pipeline.pkl')
-    bytes_in = bytearray(0)
     input_size = os.path.getsize(pickle_path)
+    bytes_in = bytearray(input_size)
     with open(pickle_path, 'rb') as fh:
-        for _ in range(0, input_size, _max_bytes):
-            bytes_in += fh.read(_max_bytes)
+        for idx in range(0, input_size, _max_bytes):
+            bytes_in[idx:idx+_max_bytes] = fh.read(_max_bytes)
     pipeline = pickle.loads(bytes_in)
 
     return {'params': params, 'pipeline': pipeline}
@@ -88,8 +88,7 @@ def write_classifier(view, data_dir):
     # See above comment about pickle on macs.
     bytes_out = pickle.dumps(view['pipeline'])
     with open(os.path.join(data_dir, 'sklearn_pipeline.pkl'), 'wb') as fh:
-        # pickle.dump(view['pipeline'], fh)
-        for idx in range(0, _n_bytes, _max_bytes):
+        for idx in range(0, len(bytes_out), _max_bytes):
             fh.write(bytes_out[idx:idx+_max_bytes])
 
 plugin.register_data_layout_reader('taxonomic_classifier', 1, dict,
