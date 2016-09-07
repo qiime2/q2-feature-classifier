@@ -56,16 +56,21 @@ def _read_to_counts(read, word_length):
                  for w, c in r.kmer_frequencies(word_length).items()})
 
 
-def _predictor(reads, pipeline, word_length, multioutput, taxonomy_separator):
-    for read in reads:
-        seq_id, X = _read_to_counts(read, word_length)
-        y = pipeline.predict([X])[0]
-        if multioutput:
-            y = taxonomy_separator.join(y)
-        yield seq_id, y
-
-
 def predict(reads, pipeline, word_length=None, taxonomy_separator=None,
-            taxonomy_depth=None, multioutput=False):
-    return _predictor(reads, pipeline, word_length, multioutput,
-                      taxonomy_separator)
+            taxonomy_depth=None, multioutput=False, chunk_size=262144):
+    while True:
+        seq_ids = []
+        X = []
+        for i, read in enumerate(reads, 1):
+            seq_id, count = _read_to_counts(read, word_length)
+            seq_ids.append(seq_id)
+            X.append(count)
+            if i % chunk_size == 0:
+                break
+        if len(seq_ids) == 0:
+            break
+        y = pipeline.predict(X)
+        for seq_id, taxon in zip(seq_ids, y):
+            if multioutput:
+                taxon = taxonomy_separator.join(taxon)
+            yield seq_id, taxon

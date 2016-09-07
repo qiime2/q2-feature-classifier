@@ -74,7 +74,8 @@ plugin.methods.register_function(
 )
 
 
-def classify(reads: types.GeneratorType, classifier: dict) -> pd.Series:
+def classify(reads: types.GeneratorType, classifier: dict, 
+             chunk_size: int=262144) -> pd.Series:
     predictions = predict(reads, classifier['pipeline'],
                           **classifier['params'])
     seq_ids, classifications = zip(*predictions)
@@ -87,7 +88,7 @@ plugin.methods.register_function(
     function=classify,
     inputs={'reads': FeatureData[Sequence],
             'classifier': TaxonomicClassifier},
-    parameters={},
+    parameters={'chunk_size': Int},
     outputs=[('classification', FeatureData[Taxonomy])],
     name='Classify reads by taxon.',
     description='Classify reads by taxon using a fitted classifier.',
@@ -98,7 +99,7 @@ plugin.methods.register_function(
     function=classify,
     inputs={'reads': FeatureData[PairedEndSequence],
             'classifier': TaxonomicClassifier},
-    parameters={},
+    parameters={'chunk_size': Int},
     outputs=[('classification', FeatureData[Taxonomy])],
     name='Classify reads by taxon.',
     description='Classify reads by taxon using a fitted classifier.',
