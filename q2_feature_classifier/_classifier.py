@@ -6,7 +6,6 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-import types
 import json
 import importlib
 import inspect
@@ -14,8 +13,8 @@ import copy
 
 import pandas as pd
 from qiime.plugin import Int, Str, Float, Bool
-from q2_types import (ReferenceFeatures, SSU, FeatureData, Taxonomy, Sequence,
-                      PairedEndSequence)
+from q2_types import (FeatureData, Taxonomy, Sequence, PairedEndSequence,
+                      DNAIterator, PairedDNAIterator)
 from sklearn.pipeline import Pipeline
 
 from ._skl import fit_pipeline, predict, _specific_fitters
@@ -34,11 +33,9 @@ def _pipeline_from_spec(spec):
     return Pipeline(steps)
 
 
-def fit_classifier(reference_reads: types.GeneratorType,
-                   reference_taxonomy: pd.Series,
-                   classifier_specification: str, word_length: int=8,
-                   taxonomy_separator: str='', taxonomy_depth: int=-1,
-                   multioutput: bool=False) -> dict:
+def _fit_classifier(reference_reads, reference_taxonomy,
+                    classifier_specification, word_length, taxonomy_separator,
+                    taxonomy_depth, multioutput):
     spec = json.loads(classifier_specification)
     pipeline = _pipeline_from_spec(spec)
     params = {'word_length': word_length,
@@ -49,24 +46,44 @@ def fit_classifier(reference_reads: types.GeneratorType,
                             pipeline, **params)
     return {'params': params, 'pipeline': pipeline}
 
+
+def fit_classifier(reference_reads: DNAIterator,
+                   reference_taxonomy: pd.Series,
+                   classifier_specification: str, word_length: int=8,
+                   taxonomy_separator: str='', taxonomy_depth: int=-1,
+                   multioutput: bool=False) -> dict:
+    return _fit_classifier(reference_reads, reference_taxonomy,
+                           classifier_specification, word_length,
+                           taxonomy_separator, taxonomy_depth, multioutput)
+
 _fitter_parameters = {'word_length': Int, 'taxonomy_separator': Str,
                       'taxonomy_depth': Int, 'multioutput': Bool}
 
 plugin.methods.register_function(
     function=fit_classifier,
     inputs={'reference_reads': FeatureData[Sequence],
-            'reference_taxonomy': ReferenceFeatures[SSU]},
+            'reference_taxonomy': FeatureData[Taxonomy]},
     parameters={**{'classifier_specification': Str}, **_fitter_parameters},
-    outputs=[('taxonomic_classifier', TaxonomicClassifier)],
+    outputs=[('classifier', TaxonomicClassifier)],
     name='Train a scikit-learn classifier.',
     description='Train a scikit-learn classifier to classify reads.'
 )
 
-fit_classifier.__name__ = 'fit_classifier_paired_end'
+
+def fit_classifier_paired_end(reference_reads: PairedDNAIterator,
+                              reference_taxonomy: pd.Series,
+                              classifier_specification: str,
+                              word_length: int=8, taxonomy_separator: str='',
+                              taxonomy_depth: int=-1,
+                              multioutput: bool=False) -> dict:
+    return _fit_classifier(reference_reads, reference_taxonomy,
+                           classifier_specification, word_length,
+                           taxonomy_separator, taxonomy_depth, multioutput)
+
 plugin.methods.register_function(
-    function=fit_classifier,
+    function=fit_classifier_paired_end,
     inputs={'reference_reads': FeatureData[PairedEndSequence],
-            'reference_taxonomy': ReferenceFeatures[SSU]},
+            'reference_taxonomy': FeatureData[Taxonomy]},
     parameters={**{'classifier_specification': Str}, **_fitter_parameters},
     outputs=[('classifier', TaxonomicClassifier)],
     name='Train a scikit-learn classifier.',
@@ -74,15 +91,20 @@ plugin.methods.register_function(
 )
 
 
-def classify(reads: types.GeneratorType, classifier: dict,
-             chunk_size: int=262144) -> pd.Series:
+def _classify(reads, classifier, chunk_size):
     predictions = predict(reads, classifier['pipeline'],
                           **classifier['params'])
     seq_ids, classifications = zip(*predictions)
     result = pd.Series(classifications, index=seq_ids)
     result.name = 'taxonomy'
     result.index.name = 'Feature ID'
-    return result
+    return result.to_frame()
+
+
+def classify(reads: DNAIterator, classifier: dict,
+             chunk_size: int=262144) -> pd.DataFrame:
+    return _classify(reads, classifier, chunk_size)
+
 
 plugin.methods.register_function(
     function=classify,
@@ -94,9 +116,15 @@ plugin.methods.register_function(
     description='Classify reads by taxon using a fitted classifier.',
 )
 
-classify.__name__ = 'classify_paired_end'
+
+def classify_paired_end(reads: PairedDNAIterator,
+                        classifier: dict,
+                        chunk_size: int=262144) -> pd.DataFrame:
+    return _classify(reads, classifier, chunk_size)
+
+
 plugin.methods.register_function(
-    function=classify,
+    function=classify_paired_end,
     inputs={'reads': FeatureData[PairedEndSequence],
             'classifier': TaxonomicClassifier},
     parameters={'chunk_size': Int},
@@ -124,11 +152,9 @@ def _register_fitter(name, spec):
         parameters[param_name] = type_map.get(annotation, Str)
         signature_params.append(new_param)
 
-    def generic_fitter(reference_reads: types.GeneratorType,
-                       reference_taxonomy: pd.Series,
-                       word_length: int=8, taxonomy_separator: str='',
-                       taxonomy_depth: int=-1, multioutput: bool=False,
-                       **kwargs) -> dict:
+    def _generic_fitter(reference_reads, reference_taxonomy, word_length,
+                        taxonomy_separator, taxonomy_depth, multioutput,
+                        **kwargs):
         this_spec = copy.deepcopy(spec)
         for param in kwargs:
             try:
@@ -145,30 +171,52 @@ def _register_fitter(name, spec):
                                 pipeline, **params)
         return {'params': params, 'pipeline': pipeline}
 
+    def generic_fitter(reference_reads: DNAIterator,
+                       reference_taxonomy: pd.Series,
+                       word_length: int=8, taxonomy_separator: str='',
+                       taxonomy_depth: int=-1, multioutput: bool=False,
+                       **kwargs) -> dict:
+        return _generic_fitter(reference_reads, reference_taxonomy,
+                               word_length, taxonomy_separator, taxonomy_depth,
+                               multioutput, **kwargs)
+
+    def generic_fitter_paired_end(reference_reads: PairedDNAIterator,
+                                  reference_taxonomy: pd.Series,
+                                  word_length: int=8,
+                                  taxonomy_separator: str='',
+                                  taxonomy_depth: int=-1,
+                                  multioutput: bool=False,
+                                  **kwargs) -> dict:
+        return _generic_fitter(reference_reads, reference_taxonomy,
+                               word_length, taxonomy_separator, taxonomy_depth,
+                               multioutput, **kwargs)
+
     parameters.update(_fitter_parameters)
-    generic_signature = inspect.signature(generic_fitter)
-    new_params = list(generic_signature.parameters.values())[:-1]
-    new_params.extend(signature_params)
-    return_annotation = generic_signature.return_annotation
-    new_signature = inspect.Signature(parameters=new_params,
-                                      return_annotation=return_annotation)
-    generic_fitter.__signature__ = new_signature
+
+    for fitter in (generic_fitter, generic_fitter_paired_end):
+        generic_signature = inspect.signature(fitter)
+        new_params = list(generic_signature.parameters.values())[:-1]
+        new_params.extend(signature_params)
+        return_annotation = generic_signature.return_annotation
+        new_signature = inspect.Signature(parameters=new_params,
+                                          return_annotation=return_annotation)
+        setattr(fitter, '__signature__', new_signature)
 
     generic_fitter.__name__ = 'fit_classifier_' + name
     plugin.methods.register_function(
         function=generic_fitter,
         inputs={'reference_reads': FeatureData[Sequence],
-                'reference_taxonomy': ReferenceFeatures[SSU]},
+                'reference_taxonomy': FeatureData[Taxonomy]},
         parameters=parameters,
         outputs=[('classifier', TaxonomicClassifier)],
         name='Train the ' + class_name + ' classifier.',
         description='Create a ' + class_name + ' classifier for reads'
     )
-    generic_fitter.__name__ = 'fit_classifier_' + name + '_paired_end'
+    generic_fitter_paired_end.__name__ = 'fit_classifier_%s_paired_end' % name
     plugin.methods.register_function(
-        function=generic_fitter,
+        function=generic_fitter_paired_end,
         inputs={'reference_reads': FeatureData[PairedEndSequence],
-                'reference_taxonomy': ReferenceFeatures[SSU]},
+                'reference_taxonomy': FeatureData[Taxonomy]},
         parameters=parameters,
         outputs=[('classifier', TaxonomicClassifier)],
         name='Train the ' + class_name + ' classifier.',
