@@ -91,8 +91,9 @@ plugin.methods.register_function(
 )
 
 
-def _classify(reads, classifier, chunk_size):
-    predictions = predict(reads, classifier['pipeline'],
+def _classify(reads, classifier, chunk_size, n_jobs, pre_dispatch):
+    predictions = predict(reads, classifier['pipeline'], chunk_size=chunk_size,
+                          n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                           **classifier['params'])
     seq_ids, classifications = zip(*predictions)
     result = pd.Series(classifications, index=seq_ids)
@@ -102,32 +103,33 @@ def _classify(reads, classifier, chunk_size):
 
 
 def classify(reads: DNAIterator, classifier: dict,
-             chunk_size: int=262144) -> pd.DataFrame:
-    return _classify(reads, classifier, chunk_size)
+             chunk_size: int=262144, n_jobs: int=1,
+             pre_dispatch: str='2*n_jobs') -> pd.DataFrame:
+    return _classify(reads, classifier, chunk_size, n_jobs, pre_dispatch)
 
 
 plugin.methods.register_function(
     function=classify,
     inputs={'reads': FeatureData[Sequence],
             'classifier': TaxonomicClassifier},
-    parameters={'chunk_size': Int},
+    parameters={'chunk_size': Int, 'n_jobs': Int, 'pre_dispatch': Str},
     outputs=[('classification', FeatureData[Taxonomy])],
     name='Classify reads by taxon.',
     description='Classify reads by taxon using a fitted classifier.',
 )
 
 
-def classify_paired_end(reads: PairedDNAIterator,
-                        classifier: dict,
-                        chunk_size: int=262144) -> pd.DataFrame:
-    return _classify(reads, classifier, chunk_size)
+def classify_paired_end(reads: PairedDNAIterator, classifier: dict,
+                        chunk_size: int=262144, n_jobs: int=1,
+                        pre_dispatch: str='2*n_jobs') -> pd.DataFrame:
+    return _classify(reads, classifier, chunk_size, n_jobs, pre_dispatch)
 
 
 plugin.methods.register_function(
     function=classify_paired_end,
     inputs={'reads': FeatureData[PairedEndSequence],
             'classifier': TaxonomicClassifier},
-    parameters={'chunk_size': Int},
+    parameters={'chunk_size': Int, 'n_jobs': Int, 'pre_dispatch': Str},
     outputs=[('classification', FeatureData[Taxonomy])],
     name='Classify reads by taxon.',
     description='Classify reads by taxon using a fitted classifier.',

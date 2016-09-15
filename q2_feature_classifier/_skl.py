@@ -9,7 +9,7 @@
 from itertools import islice
 
 import skbio
-from joblib import Parallel, delayed
+from sklearn.externals.joblib import Parallel, delayed
 
 _specific_fitters = [
     ['svc', {'steps': [
@@ -68,8 +68,8 @@ def predict(reads, pipeline, word_length=None, taxonomy_separator=None,
             _chunks(reads, chunk_size)) for m in c)
 
 
-def _predict_chunk(pipeline, multioutput, taxonomy_separator, seq_ids,
-                   word_length, chunk):
+def _predict_chunk(pipeline, multioutput, taxonomy_separator, word_length,
+                   chunk):
     seq_ids, X = zip(*[_read_to_counts(read, word_length) for read in chunk])
     y = pipeline.predict(X)
     for seq_id, taxon in zip(seq_ids, y):
