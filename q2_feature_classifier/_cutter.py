@@ -6,21 +6,19 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-import types
-
 from qiime.plugin import Int, Str, Choices
-from q2_types import ReferenceFeatures, SSU, FeatureData, PairedEndSequence, \
-        Sequence
+from q2_types import (
+    FeatureData, PairedEndSequence, Sequence, DNAIterator, PairedDNAIterator)
 import skbio
 
 from ._gregex import extract_reads_by_match, extract_reads_by_position
 from .plugin_setup import plugin
 
 
-def extract_paired_end_reads(sequences: types.GeneratorType, read_length: int,
+def extract_paired_end_reads(sequences: DNAIterator, read_length: int,
                              f_primer: str, r_primer: str,
                              method: str='position', n_sample: int=10000
-                             ) -> types.GeneratorType:
+                             ) -> PairedDNAIterator:
     """Extract the reads selected by a primer or primer pair.
 
     Parameters
@@ -56,17 +54,19 @@ def extract_paired_end_reads(sequences: types.GeneratorType, read_length: int,
     r_primer = skbio.DNA(r_primer)
 
     if method == 'match':
-        return extract_reads_by_match(sequences, read_length, f_primer,
-                                      r_primer, 'pe')
+        result = extract_reads_by_match(sequences, read_length, f_primer,
+                                        r_primer, 'pe')
     elif method == 'position':
-        return extract_reads_by_position(sequences, read_length, f_primer,
-                                         r_primer, 'pe', n_sample)
+        result = extract_reads_by_position(sequences, read_length, f_primer,
+                                           r_primer, 'pe', n_sample)
     else:
         raise ValueError(method + ' method not supported')
 
+    return PairedDNAIterator(result)
+
 plugin.methods.register_function(
     function=extract_paired_end_reads,
-    inputs={'sequences': ReferenceFeatures[SSU]},
+    inputs={'sequences': FeatureData[Sequence]},
     parameters={'read_length': Int,
                 'f_primer': Str,
                 'r_primer': Str,
@@ -78,10 +78,10 @@ plugin.methods.register_function(
 )
 
 
-def extract_reads(sequences: types.GeneratorType, read_length: int,
+def extract_reads(sequences: DNAIterator, read_length: int,
                   f_primer: str, r_primer: str, method: str='position',
                   direction: str='forward', n_sample: int=10000
-                  ) -> types.GeneratorType:
+                  ) -> DNAIterator:
     """Extract the read selected by a primer or primer pair.
 
     Parameters
@@ -127,12 +127,14 @@ def extract_reads(sequences: types.GeneratorType, read_length: int,
     else:
         raise ValueError(method + ' method not supported')
 
-    for single_sequence_tuple in result:
-        yield single_sequence_tuple[0]
+    def read_seqs():
+        for single_sequence_tuple in result:
+            yield single_sequence_tuple[0]
+    return DNAIterator(read_seqs())
 
 plugin.methods.register_function(
     function=extract_reads,
-    inputs={'sequences': ReferenceFeatures[SSU]},
+    inputs={'sequences': FeatureData[Sequence]},
     parameters={'read_length': Int,
                 'f_primer': Str,
                 'r_primer': Str,

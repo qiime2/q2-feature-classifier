@@ -10,6 +10,7 @@ from qiime.plugin import Plugin
 
 import q2_feature_classifier
 
+
 plugin = Plugin(
     name='feature-classifier',
     version=q2_feature_classifier.__version__,

@@ -6,53 +6,74 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-import os.path
-import tempfile
 import unittest
+import json
 
-from qiime.sdk import Artifact, PluginManager
+from sklearn.externals import joblib
+
+from .._taxonomic_classifier import (
+    TaxonomicClassifier, TaxonomicClassifierDirFmt, JSONFormat, PickleFormat)
+from . import FeatureClassifierTestPluginBase
 
 
-class TypesTests(unittest.TestCase):
+class TestTypes(FeatureClassifierTestPluginBase):
+    def test_taxonomic_classifier_semantic_type_registration(self):
+        self.assertRegisteredSemanticType(TaxonomicClassifier)
 
-    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            'data')
+    def test_taxonomic_classifier_semantic_type_to_format_registration(self):
+        self.assertSemanticTypeRegisteredToFormat(
+            TaxonomicClassifier, TaxonomicClassifierDirFmt)
 
-    def test_load_save(self):
-        # confirm that
-        # the artifact can be loaded and a new artifact saved and reloaded
-        # load example artifact
-        artifact_fp = os.path.join(self.data_dir,
-                                   'taxonomic-classifier.qza')
-        a = Artifact.load(artifact_fp)
-        with tempfile.NamedTemporaryFile(suffix='.qza') as f:
-            # save loaded artifact
-            a.save(f.name)
-            # reload saved artifact
-            Artifact.load(f.name)
 
-    def test_data_layout_readers_and_writers(self):
-        # Confirm that for the example artifact,
-        # all registered views of that artifact can be loaded without error
-        # (the data in the view is not yet tested, just that it loads without
-        # error). Also test that for each registered writer, an appropriate
-        # view can be written. Note: the writer tests assume there is a
-        # corresponding reader for the writer's type, which may not always be
-        # true (but is for the types currently in this repo). This test may
-        # need to be revised if this assumption doesn't hold in the future.
-        pm = PluginManager()
-        # load example artifact
-        artifact_fp = os.path.join(self.data_dir,
-                                   'taxonomic-classifier.qza')
-        a = Artifact.load(artifact_fp)
-        data_layout = pm.get_data_layout(a.type)
-        for view_type in data_layout.readers:
-            view = a.view(view_type)
-            self.assertIs(type(view), view_type)
-        for view_type in data_layout.writers:
-            view = a.view(view_type)
-            self.assertIs(type(view), view_type)
-            Artifact._from_view(view, a.type, None)
+class TestFormats(FeatureClassifierTestPluginBase):
+    package = 'q2_feature_classifier.tests'
+
+    def test_taxonomic_classifier_dir_fmt(self):
+        format = self._setup_dir(['sklearn_pipeline.pkl',
+                                  'preprocess_params.json'],
+                                 TaxonomicClassifierDirFmt)
+        # Should not error
+        format.validate()
+
+
+class TestTransformers(FeatureClassifierTestPluginBase):
+    package = 'q2_feature_classifier.tests'
+
+    def test_taxo_class_dir_fmt_to_taxo_class_result(self):
+        transformer = self.get_transformer(TaxonomicClassifierDirFmt, dict)
+        input = self._setup_dir(['sklearn_pipeline.pkl',
+                                 'preprocess_params.json'],
+                                TaxonomicClassifierDirFmt)
+
+        obs = transformer(input)
+        exp = ['params', 'pipeline']
+
+        self.assertSetEqual(set(obs.keys()), set(exp))
+
+    def test_taxo_class_result_to_taxo_class_dir_fmt(self):
+        transformer = self.get_transformer(dict, TaxonomicClassifierDirFmt)
+        params_filepath = self.get_data_path('preprocess_params.json')
+        pipeline_filepath = self.get_data_path('sklearn_pipeline.pkl')
+
+        with open(params_filepath) as fh:
+            params = json.load(fh)
+        pipeline = joblib.load(pipeline_filepath)
+
+        exp = {'params': params, 'pipeline': pipeline}
+
+        obs = transformer(exp)
+
+        preprocess_params = obs.preprocess_params.view(JSONFormat)
+        sklearn_pipeline = obs.sklearn_pipeline.view(PickleFormat)
+
+        with preprocess_params.open() as fh:
+            obs_params = json.load(fh)
+        obs_pipeline = joblib.load(str(sklearn_pipeline))
+
+        obs = {'params': obs_params, 'pipeline': obs_pipeline}
+
+        self.assertEqual(obs['params'], exp['params'])
+        self.assertTrue(obs['pipeline'])
 
 
 if __name__ == "__main__":
