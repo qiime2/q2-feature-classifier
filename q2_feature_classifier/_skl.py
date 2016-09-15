@@ -6,7 +6,10 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+from itertools import islice
+
 import skbio
+from joblib import Parallel, delayed
 
 _specific_fitters = [
     ['svc', {'steps': [
@@ -57,20 +60,27 @@ def _read_to_counts(read, word_length):
 
 
 def predict(reads, pipeline, word_length=None, taxonomy_separator=None,
-            taxonomy_depth=None, multioutput=False, chunk_size=262144):
+            taxonomy_depth=None, multioutput=False, chunk_size=262144,
+            n_jobs=1, pre_dispatch='2*n_jobs'):
+    return (m for c in Parallel(n_jobs=n_jobs, pre_dispatch=pre_dispatch)
+            (delayed(_predict_chunk)(pipeline, multioutput, taxonomy_separator,
+                                     word_length, chunk) for chunk in
+            _chunks(reads, chunk_size)) for m in c)
+
+
+def _predict_chunk(pipeline, multioutput, taxonomy_separator, seq_ids,
+                   word_length, chunk):
+    seq_ids, X = zip(*[_read_to_counts(read, word_length) for read in chunk])
+    y = pipeline.predict(X)
+    for seq_id, taxon in zip(seq_ids, y):
+        if multioutput:
+            taxon = taxonomy_separator.join(taxon)
+        yield seq_id, taxon
+
+
+def _chunks(reads, chunk_size):
     while True:
-        seq_ids = []
-        X = []
-        for i, read in enumerate(reads, 1):
-            seq_id, count = _read_to_counts(read, word_length)
-            seq_ids.append(seq_id)
-            X.append(count)
-            if i % chunk_size == 0:
-                break
-        if len(seq_ids) == 0:
+        chunk = list(islice(reads, chunk_size))
+        if len(chunk) == 0:
             break
-        y = pipeline.predict(X)
-        for seq_id, taxon in zip(seq_ids, y):
-            if multioutput:
-                taxon = taxonomy_separator.join(taxon)
-            yield seq_id, taxon
+        yield chunk
