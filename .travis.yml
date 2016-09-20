@@ -18,7 +18,7 @@ install:
   - pip install https://github.com/qiime2/qiime2/archive/master.zip
   - pip install https://github.com/qiime2/q2-types/archive/master.zip
   - pip install .
-  - echo "backend      : Agg" > matplotlibrc
+  - 'echo "backend      : Agg" > matplotlibrc'
 script:
   - nosetests
   - flake8 q2_feature_classifier setup.py
