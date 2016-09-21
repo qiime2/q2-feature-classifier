@@ -6,18 +6,15 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-import pickle
 import json
+import tarfile
+import os
 
+from sklearn.externals import joblib
 import qiime.plugin
 import qiime.plugin.model as model
 
 from .plugin_setup import plugin
-
-
-# Constants
-_n_bytes = 2**31
-_max_bytes = _n_bytes - 1
 
 
 # Semantic Types
@@ -25,12 +22,9 @@ TaxonomicClassifier = qiime.plugin.SemanticType('TaxonomicClassifier')
 
 
 # Formats
-# https://github.com/qiime2/q2-types/issues/49
 class PickleFormat(model.BinaryFileFormat):
     def sniff(self):
-        # Trying to detect a large pickled file seems difficult to the point of
-        # not being worth it. http://stackoverflow.com/q/13939913/313548
-        return True
+        return tarfile.is_tarfile(str(self))
 
 
 # https://github.com/qiime2/q2-types/issues/49
@@ -47,7 +41,7 @@ class JSONFormat(model.TextFileFormat):
 
 class TaxonomicClassifierDirFmt(model.DirectoryFormat):
     preprocess_params = model.File('preprocess_params.json', format=JSONFormat)
-    sklearn_pipeline = model.File('sklearn_pipeline.pkl', format=PickleFormat)
+    sklearn_pipeline = model.File('sklearn_pipeline.tar', format=PickleFormat)
 
 
 # Transformers
@@ -60,15 +54,14 @@ def _1(dirfmt: TaxonomicClassifierDirFmt) -> dict:
 
     with preprocess_params.open() as fh:
         params = json.load(fh)
-    # Macs can't pickle or unpickle objects larger than ~2GB. See
-    # http://bugs.python.org/issue24658 Thanks for the workaround:
-    # http://stackoverflow.com/q/31468117/313548
-    input_size = sklearn_pipeline.path.stat().st_size
-    bytes_in = bytearray(input_size)
-    with sklearn_pipeline.open() as fh:
-        for idx in range(0, input_size, _max_bytes):
-            bytes_in[idx:idx+_max_bytes] = fh.read(_max_bytes)
-    pipeline = pickle.loads(bytes_in)
+
+    with tarfile.open(str(sklearn_pipeline)) as tar:
+        dirname = os.path.dirname(str(sklearn_pipeline))
+        tar.extractall(dirname)
+        pipeline = joblib.load(os.path.join(dirname, 'sklearn_pipeline.pkl'))
+        for fn in tar.getnames():
+            os.unlink(os.path.join(dirname, fn))
+
     return {'params': params, 'pipeline': pipeline}
 
 
@@ -84,11 +77,12 @@ def _2(data: dict) -> TaxonomicClassifierDirFmt:
         json.dump(data['params'], fh)
 
     sklearn_pipeline = PickleFormat()
-    # See above comment about pickle on macs.
-    bytes_out = pickle.dumps(data['pipeline'])
-    with sklearn_pipeline.open() as fh:
-        for idx in range(0, len(bytes_out), _max_bytes):
-            fh.write(bytes_out[idx:idx+_max_bytes])
+    with tarfile.open(str(sklearn_pipeline), 'w') as tar:
+        pf = os.path.join(os.path.dirname(str(sklearn_pipeline)),
+                          'sklearn_pipeline.pkl')
+        for fn in joblib.dump(data['pipeline'], pf):
+            tar.add(fn, os.path.basename(fn))
+            os.unlink(fn)
 
     dirfmt = TaxonomicClassifierDirFmt()
     dirfmt.preprocess_params.write_data(preprocess_params, JSONFormat)

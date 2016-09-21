@@ -8,6 +8,9 @@
 
 import unittest
 import json
+import tempfile
+import tarfile
+import os
 
 from sklearn.externals import joblib
 
@@ -29,7 +32,7 @@ class TestFormats(FeatureClassifierTestPluginBase):
     package = 'q2_feature_classifier.tests'
 
     def test_taxonomic_classifier_dir_fmt(self):
-        format = self._setup_dir(['sklearn_pipeline.pkl',
+        format = self._setup_dir(['sklearn_pipeline.tar',
                                   'preprocess_params.json'],
                                  TaxonomicClassifierDirFmt)
         # Should not error
@@ -41,7 +44,7 @@ class TestTransformers(FeatureClassifierTestPluginBase):
 
     def test_taxo_class_dir_fmt_to_taxo_class_result(self):
         transformer = self.get_transformer(TaxonomicClassifierDirFmt, dict)
-        input = self._setup_dir(['sklearn_pipeline.pkl',
+        input = self._setup_dir(['sklearn_pipeline.tar',
                                  'preprocess_params.json'],
                                 TaxonomicClassifierDirFmt)
 
@@ -53,11 +56,22 @@ class TestTransformers(FeatureClassifierTestPluginBase):
     def test_taxo_class_result_to_taxo_class_dir_fmt(self):
         transformer = self.get_transformer(dict, TaxonomicClassifierDirFmt)
         params_filepath = self.get_data_path('preprocess_params.json')
-        pipeline_filepath = self.get_data_path('sklearn_pipeline.pkl')
+        pipeline_filepath = self.get_data_path('sklearn_pipeline.tar')
 
         with open(params_filepath) as fh:
             params = json.load(fh)
-        pipeline = joblib.load(pipeline_filepath)
+
+        def read_pipeline(pipeline_filepath):
+            with tarfile.open(pipeline_filepath) as tar:
+                dirname = tempfile.mkdtemp()
+                tar.extractall(dirname)
+                pipeline = joblib.load(os.path.join(dirname,
+                                       'sklearn_pipeline.pkl'))
+                for fn in tar.getnames():
+                    os.unlink(os.path.join(dirname, fn))
+                os.rmdir(dirname)
+            return pipeline
+        pipeline = read_pipeline(pipeline_filepath)
 
         exp = {'params': params, 'pipeline': pipeline}
 
@@ -68,7 +82,7 @@ class TestTransformers(FeatureClassifierTestPluginBase):
 
         with preprocess_params.open() as fh:
             obs_params = json.load(fh)
-        obs_pipeline = joblib.load(str(sklearn_pipeline))
+        obs_pipeline = read_pipeline(str(sklearn_pipeline))
 
         obs = {'params': obs_params, 'pipeline': obs_pipeline}
 
