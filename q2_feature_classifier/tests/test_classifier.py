@@ -31,12 +31,9 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
                                      self.get_data_path('pe-dna-sequences'))
 
         classifier_specification = \
-            {'steps': [['vectorize',
-                        'sklearn.feature_extraction.DictVectorizer'],
-                       ['transform',
-                        'sklearn.feature_selection.SelectPercentile'],
-                       ['classify',
-                        'sklearn.naive_bayes.MultinomialNB']]}
+            {'steps': [['vectorize', 'feature_extraction.DictVectorizer'],
+                       ['transform', 'feature_selection.SelectPercentile'],
+                       ['classify', 'naive_bayes.MultinomialNB']]}
         classifier_specification = json.dumps(classifier_specification)
         fit_classifier = feature_classifier.methods.fit_classifier_paired_end
         result = fit_classifier(reads, self.taxonomy, classifier_specification,
@@ -60,12 +57,9 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             self.get_data_path('se-dna-sequences.fasta'))
 
         classifier_specification = \
-            {'steps': [['vectorize',
-                        'sklearn.feature_extraction.DictVectorizer'],
-                       ['transform',
-                        'sklearn.feature_selection.SelectPercentile'],
-                       ['classify',
-                        'sklearn.naive_bayes.MultinomialNB']]}
+            {'steps': [['vectorize', 'feature_extraction.DictVectorizer'],
+                       ['transform', 'feature_selection.SelectPercentile'],
+                       ['classify', 'naive_bayes.MultinomialNB']]}
         classifier_specification = json.dumps(classifier_specification)
         fit_classifier = feature_classifier.methods.fit_classifier
         result = fit_classifier(reads, self.taxonomy, classifier_specification,

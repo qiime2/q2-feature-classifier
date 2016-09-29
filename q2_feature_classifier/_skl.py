@@ -16,13 +16,13 @@ import numpy
 
 _specific_fitters = [
     ['svc', {'steps': [
-     ['vectorize', 'sklearn.feature_extraction.DictVectorizer'],
-     ['transform', 'sklearn.feature_selection.SelectPercentile'],
-     ['classify', 'sklearn.svm.SVC']],
+     ['vectorize', 'feature_extraction.DictVectorizer'],
+     ['transform', 'feature_selection.SelectPercentile'],
+     ['classify', 'svm.SVC']],
      'classify': {'C': 10, 'kernel': 'linear', 'degree': 3, 'gamma': 0.001}}],
     ['naive_bayes', {'steps': [
-     ['vectorize', 'sklearn.feature_extraction.DictVectorizer'],
-     ['classify', 'sklearn.naive_bayes.MultinomialNB']],
+     ['vectorize', 'feature_extraction.DictVectorizer'],
+     ['classify', 'naive_bayes.MultinomialNB']],
                      'classify': {'alpha': 0.01}}]]
 
 

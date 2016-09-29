@@ -24,7 +24,7 @@ from .plugin_setup import plugin
 
 def _load_class(classname):
     module, klass = classname.rsplit('.', 1)
-    module = importlib.import_module(module)
+    module = importlib.import_module('.'+module, 'sklearn')
     return getattr(module, klass)
 
 
