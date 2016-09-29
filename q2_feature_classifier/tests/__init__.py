@@ -9,7 +9,7 @@
 import tempfile
 import shutil
 
-from q2_types.testing import TestPluginBase
+from qiime.plugin.testing import TestPluginBase
 
 
 class FeatureClassifierTestPluginBase(TestPluginBase):
