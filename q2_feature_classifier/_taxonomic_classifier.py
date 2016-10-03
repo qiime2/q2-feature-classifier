@@ -91,6 +91,7 @@ def _2(data: dict) -> TaxonomicClassifierDirFmt:
     return dirfmt
 
 # Registrations
-plugin.register_semantic_type(TaxonomicClassifier)
+plugin.register_semantic_types(TaxonomicClassifier)
+plugin.register_formats(PickleFormat, JSONFormat, TaxonomicClassifierDirFmt)
 plugin.register_semantic_type_to_format(
     TaxonomicClassifier, artifact_format=TaxonomicClassifierDirFmt)
