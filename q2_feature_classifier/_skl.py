@@ -146,10 +146,10 @@ def _predict_chunk_with_bs(pipeline, taxonomy_separator,
         X.extend(bs)
     y = pipeline.predict(X)
     results = []
+    confidence *= 100
     for seq_id, i in zip(seq_ids, range(0, len(y), 101)):
         taxon = y[i].split(taxonomy_separator)
         bootstraps = [l.split(taxonomy_separator) for l in y[i+1:i+101]]
-        confidence *= 100
         result = None
         for i in range(1, len(taxon)+1):
             matches = sum(taxon[:i] == bs[:i] for bs in bootstraps)
