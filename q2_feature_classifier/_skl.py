@@ -21,9 +21,10 @@ _specific_fitters = [
      ['classify', 'svm.SVC']],
      'classify': {'C': 10, 'kernel': 'linear', 'degree': 3, 'gamma': 0.001}}],
     ['naive_bayes', {'steps': [
-     ['vectorize', 'feature_extraction.DictVectorizer'],
+     ['hash', 'feature_extraction.FeatureHasher'],
      ['classify', 'naive_bayes.MultinomialNB']],
-                     'classify': {'alpha': 0.01}}]]
+     'classify': {'alpha': 0.01},
+     'hash': {'non_negative': True, 'n_features': 8192}}]]
 
 
 def _extract_features(reads, word_length):
