@@ -8,7 +8,6 @@
 
 from itertools import islice, repeat
 from collections import Counter
-from copy import deepcopy
 
 import skbio
 from sklearn.externals.joblib import Parallel, delayed
@@ -123,49 +122,45 @@ def predict(reads, pipeline, word_length=None, taxonomy_separator='',
 def _predict_chunk(pipeline, taxonomy_separator, word_length,
                    confidence, chunk):
     if confidence < 0.:
-        return _predict_chunk_without_conf(pipeline, taxonomy_separator,
-                                           word_length, chunk)
+        return _predict_chunk_without_bs(pipeline, taxonomy_separator,
+                                         word_length, chunk)
     else:
-        return _predict_chunk_with_conf(pipeline, taxonomy_separator,
-                                        word_length, confidence, chunk)
+        return _predict_chunk_with_bs(pipeline, taxonomy_separator,
+                                      word_length, confidence, chunk)
 
 
-def _predict_chunk_without_conf(pipeline, taxonomy_separator,
-                                word_length, chunk):
+def _predict_chunk_without_bs(pipeline, taxonomy_separator,
+                              word_length, chunk):
     seq_ids, X = zip(*[_read_to_counts(read, word_length) for read in chunk])
     y = pipeline.predict(X)
     return zip(seq_ids, y, repeat(-1.))
 
 
-def _predict_chunk_with_conf(pipeline, taxonomy_separator, word_length,
-                             confidence, chunk):
-    seq_ids, X = zip(*[_read_to_counts(read, word_length) for read in chunk])
-
-    if not hasattr(pipeline, "predict_proba"):
-        raise ValueError('this classifier does not support confidence values')
-    prob_pos = pipeline.predict_proba(X)
-    if prob_pos.shape != (len(X), len(pipeline.classes_)):
-        raise ValueError('this classifier does not support confidence values')
-
-    y = pipeline.classes_[prob_pos.argmax(axis=1)]
-
+def _predict_chunk_with_bs(pipeline, taxonomy_separator,
+                           word_length, confidence, chunk):
+    seq_ids = []
+    X = []
+    for read in chunk:
+        seq_id, count, bs = _read_to_counts(read, word_length, confidence)
+        seq_ids.append(seq_id)
+        X.append(count)
+        X.extend(bs)
+    y = pipeline.predict(X)
     results = []
-    split_classes = [c.split(taxonomy_separator) for c in pipeline.classes_]
-    for seq_id, taxon, class_probs in zip(seq_ids, y, prob_pos):
-        taxon = taxon.split(taxonomy_separator)
-        classes = zip(deepcopy(split_classes), class_probs)
-        result = []
-        for level in taxon:
-            classes = [cls for cls in classes if cls[0].pop(0) == level]
-            cum_prob = sum(c[1] for c in classes)
-            if cum_prob < confidence:
+    confidence *= 100
+    for seq_id, i in zip(seq_ids, range(0, len(y), 101)):
+        taxon = y[i].split(taxonomy_separator)
+        bootstraps = [l.split(taxonomy_separator) for l in y[i+1:i+101]]
+        result = None
+        for i in range(1, len(taxon)+1):
+            matches = sum(taxon[:i] == bs[:i] for bs in bootstraps)
+            if matches < confidence:
                 break
-            result.append(level)
-            result_confidence = cum_prob
-        if len(result) > 0:
+            result = taxon[:i]
+            result_confidence = matches/100
+        if result is not None:
             result = taxonomy_separator.join(result)
             results.append((seq_id, result, result_confidence))
-
     return results
 
 
