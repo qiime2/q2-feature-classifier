@@ -8,8 +8,9 @@
 
 import tempfile
 import shutil
+from warnings import filterwarnings
 
-from qiime.plugin.testing import TestPluginBase
+from qiime2.plugin.testing import TestPluginBase
 
 
 class FeatureClassifierTestPluginBase(TestPluginBase):
@@ -23,6 +24,8 @@ class FeatureClassifierTestPluginBase(TestPluginBase):
 
         self.temp_dir = tempfile.TemporaryDirectory(
             prefix='q2-feature-classifier-test-temp-')
+
+        filterwarnings('ignore', 'The TaxonomicClassifier ', UserWarning)
 
     def _setup_dir(self, filenames, dirfmt):
         for filename in filenames:
