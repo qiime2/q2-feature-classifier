@@ -18,7 +18,7 @@ setup(
     author_email="kaehler@gmail.com",
     description="Functionality for taxonomic classification",
     license='BSD-3-Clause',
-    url="https://github.com/BenKaehler/q2-feature-classifier",
+    url="https://github.com/qiime2/q2-feature-classifier",
     entry_points={
         'qiime.plugins':
         ['q2-feature-classifier=q2_feature_classifier.plugin_setup:plugin']
