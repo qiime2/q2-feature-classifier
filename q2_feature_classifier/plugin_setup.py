@@ -14,6 +14,6 @@ import q2_feature_classifier
 plugin = Plugin(
     name='feature-classifier',
     version=q2_feature_classifier.__version__,
-    website='https://github.com/BenKaehler/q2-feature-classifier',
+    website='https://github.com/qiime2/q2-feature-classifier',
     package='q2_feature_classifier'
 )
