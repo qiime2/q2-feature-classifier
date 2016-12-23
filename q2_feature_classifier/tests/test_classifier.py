@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -8,8 +8,8 @@
 
 import json
 
-from qiime.sdk import Artifact
-from qiime.plugins import feature_classifier
+from qiime2.sdk import Artifact
+from qiime2.plugins import feature_classifier
 import pandas as pd
 
 from q2_feature_classifier._skl import _specific_fitters
