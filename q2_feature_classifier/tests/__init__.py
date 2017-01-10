@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -9,7 +9,7 @@
 import tempfile
 import shutil
 
-from qiime.plugin.testing import TestPluginBase
+from qiime2.plugin.testing import TestPluginBase
 
 
 class FeatureClassifierTestPluginBase(TestPluginBase):

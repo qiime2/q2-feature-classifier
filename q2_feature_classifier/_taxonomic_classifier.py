@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, QIIME development team.
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -11,14 +11,14 @@ import tarfile
 import os
 
 from sklearn.externals import joblib
-import qiime.plugin
-import qiime.plugin.model as model
+import qiime2.plugin
+import qiime2.plugin.model as model
 
 from .plugin_setup import plugin
 
 
 # Semantic Types
-TaxonomicClassifier = qiime.plugin.SemanticType('TaxonomicClassifier')
+TaxonomicClassifier = qiime2.plugin.SemanticType('TaxonomicClassifier')
 
 
 # Formats
@@ -89,6 +89,7 @@ def _2(data: dict) -> TaxonomicClassifierDirFmt:
     dirfmt.sklearn_pipeline.write_data(sklearn_pipeline, PickleFormat)
 
     return dirfmt
+
 
 # Registrations
 plugin.register_semantic_types(TaxonomicClassifier)

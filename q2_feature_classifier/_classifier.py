@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -12,9 +12,10 @@ import inspect
 import copy
 
 import pandas as pd
-from qiime.plugin import Int, Str, Float, Bool
-from q2_types import (FeatureData, Taxonomy, Sequence, PairedEndSequence,
-                      DNAIterator, PairedDNAIterator)
+from qiime2.plugin import Int, Str, Float, Bool
+from q2_types.feature_data import (FeatureData, Taxonomy, Sequence,
+                                   PairedEndSequence, DNAIterator,
+                                   PairedDNAIterator)
 from sklearn.pipeline import Pipeline
 
 from ._skl import fit_pipeline, predict, _specific_fitters
@@ -48,8 +49,10 @@ def fit_classifier(reference_reads: DNAIterator,
                             pipeline, **params)
     return {'params': params, 'pipeline': pipeline}
 
+
 _fitter_parameters = {'word_length': Int, 'taxonomy_separator': Str,
                       'taxonomy_depth': Int, 'multioutput': Bool}
+
 
 plugin.methods.register_function(
     function=fit_classifier,
@@ -97,8 +100,10 @@ def classify(reads: DNAIterator, classifier: dict,
     result.index.name = 'Feature ID'
     return result
 
+
 _classify_parameters = {'chunk_size': Int, 'n_jobs': Int, 'pre_dispatch': Str,
                         'confidence': Float}
+
 
 plugin.methods.register_function(
     function=classify,
@@ -210,6 +215,7 @@ def _register_fitter(name, spec):
         description='Create a ' + class_name +
                     ' classifier for paired-end reads'
     )
+
 
 for name, pipeline in _specific_fitters:
     _register_fitter(name, pipeline)

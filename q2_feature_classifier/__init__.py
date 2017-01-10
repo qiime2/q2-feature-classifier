@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -9,7 +9,7 @@
 import importlib
 import pkg_resources
 
-__version__ = pkg_resources.require('q2_feature_classifier')[0].version
+__version__ = pkg_resources.get_distribution('q2-feature-classifier').version
 
 
 importlib.import_module('q2_feature_classifier._classifier')

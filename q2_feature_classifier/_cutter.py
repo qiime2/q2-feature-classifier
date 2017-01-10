@@ -1,13 +1,13 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-from qiime.plugin import Int, Str, Choices
-from q2_types import (
+from qiime2.plugin import Int, Str, Choices
+from q2_types.feature_data import (
     FeatureData, PairedEndSequence, Sequence, DNAIterator, PairedDNAIterator)
 import skbio
 
@@ -63,6 +63,7 @@ def extract_paired_end_reads(sequences: DNAIterator, read_length: int,
         raise ValueError(method + ' method not supported')
 
     return PairedDNAIterator(result)
+
 
 plugin.methods.register_function(
     function=extract_paired_end_reads,
@@ -131,6 +132,7 @@ def extract_reads(sequences: DNAIterator, read_length: int,
         for single_sequence_tuple in result:
             yield single_sequence_tuple[0]
     return DNAIterator(read_seqs())
+
 
 plugin.methods.register_function(
     function=extract_reads,
