@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -7,8 +7,7 @@
 # ----------------------------------------------------------------------------
 
 from qiime2.plugin import Int, Str, Float
-from q2_types.feature_data import (
-    FeatureData, Sequence, DNAIterator)
+from q2_types.feature_data import FeatureData, Sequence, DNAIterator
 import skbio
 
 from .plugin_setup import plugin
@@ -118,6 +117,7 @@ def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
     """
     return DNAIterator(_gen_reads(sequences, f_primer, r_primer, length,
                                   identity))
+
 
 plugin.methods.register_function(
     function=extract_reads,

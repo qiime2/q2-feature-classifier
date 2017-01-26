@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -9,7 +9,6 @@
 from qiime2.plugins import feature_classifier
 from qiime2.sdk import Artifact
 from q2_types.feature_data import FeatureData, Sequence, DNAIterator
-
 
 from . import FeatureClassifierTestPluginBase
 

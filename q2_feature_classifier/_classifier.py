@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, Ben Kaehler
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -129,8 +129,10 @@ def classify(reads: DNAIterator, classifier: Pipeline,
     result.index.name = 'Feature ID'
     return result
 
+
 _classify_parameters = {'chunk_size': Int, 'n_jobs': Int, 'pre_dispatch': Str,
                         'confidence': Float}
+
 
 plugin.methods.register_function(
     function=classify,
@@ -204,6 +206,7 @@ def _register_fitter(name, spec):
         name='Train the ' + name + ' classifier.',
         description='Create a ' + name + ' classifier for reads'
     )
+
 
 for name, pipeline in _specific_fitters:
     _register_fitter(name, pipeline)

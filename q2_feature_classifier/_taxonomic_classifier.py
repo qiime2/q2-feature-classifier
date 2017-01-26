@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016--, QIIME development team.
+# Copyright (c) 2016-2017, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -76,6 +76,7 @@ def _2(data: Pipeline) -> TaxonomicClassifierDirFmt:
     dirfmt.sklearn_pipeline.write_data(sklearn_pipeline, PickleFormat)
 
     return dirfmt
+
 
 # Registrations
 plugin.register_semantic_types(TaxonomicClassifier)
