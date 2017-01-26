@@ -101,6 +101,7 @@ def fit_classifier(reference_reads: DNAIterator, reference_taxonomy: pd.Series,
     pipeline = fit_pipeline(reference_reads, reference_taxonomy, pipeline)
     return pipeline
 
+
 plugin.methods.register_function(
     function=fit_classifier,
     inputs={'reference_reads': FeatureData[Sequence],
