@@ -12,10 +12,12 @@ import tempfile
 import tarfile
 import os
 
+import sklearn
 from sklearn.externals import joblib
 
 from .._taxonomic_classifier import (
-    TaxonomicClassifier, TaxonomicClassifierDirFmt, JSONFormat, PickleFormat)
+    TaxonomicClassifier, TaxonomicClassifierDirFmt, JSONFormat,
+    PickleFormat, VersionedTaxonomicClassifierDirFmt)
 from . import FeatureClassifierTestPluginBase
 
 
@@ -25,16 +27,19 @@ class TestTypes(FeatureClassifierTestPluginBase):
 
     def test_taxonomic_classifier_semantic_type_to_format_registration(self):
         self.assertSemanticTypeRegisteredToFormat(
-            TaxonomicClassifier, TaxonomicClassifierDirFmt)
+            TaxonomicClassifier, VersionedTaxonomicClassifierDirFmt)
 
 
 class TestFormats(FeatureClassifierTestPluginBase):
     package = 'q2_feature_classifier.tests'
 
     def test_taxonomic_classifier_dir_fmt(self):
+        with open(os.path.join(self.temp_dir.name,
+                               'sklearn_version.json'), 'w') as fh:
+            fh.write(json.dumps({'sklearn-version': sklearn.__version__}))
         format = self._setup_dir(['sklearn_pipeline.tar',
                                   'preprocess_params.json'],
-                                 TaxonomicClassifierDirFmt)
+                                 VersionedTaxonomicClassifierDirFmt)
         # Should not error
         format.validate()
 
@@ -42,11 +47,37 @@ class TestFormats(FeatureClassifierTestPluginBase):
 class TestTransformers(FeatureClassifierTestPluginBase):
     package = 'q2_feature_classifier.tests'
 
-    def test_taxo_class_dir_fmt_to_taxo_class_result(self):
+    def test_old_sklearn_version(self):
+        transformer = self.get_transformer(
+            VersionedTaxonomicClassifierDirFmt, dict)
+
+        with open(os.path.join(self.temp_dir.name,
+                               'sklearn_version.json'), 'w') as fh:
+            fh.write(json.dumps({'sklearn-version': 'a very old version'}))
+        input = self._setup_dir(['sklearn_pipeline.tar',
+                                 'preprocess_params.json'],
+                                VersionedTaxonomicClassifierDirFmt)
+        with self.assertRaises(ValueError):
+            transformer(input)
+
+    def test_old_dirfmt(self):
         transformer = self.get_transformer(TaxonomicClassifierDirFmt, dict)
         input = self._setup_dir(['sklearn_pipeline.tar',
                                  'preprocess_params.json'],
                                 TaxonomicClassifierDirFmt)
+        with self.assertRaises(ValueError):
+            transformer(input)
+
+    def test_taxo_class_dir_fmt_to_taxo_class_result(self):
+        transformer = self.get_transformer(
+            VersionedTaxonomicClassifierDirFmt, dict)
+
+        with open(os.path.join(self.temp_dir.name,
+                               'sklearn_version.json'), 'w') as fh:
+            fh.write(json.dumps({'sklearn-version': sklearn.__version__}))
+        input = self._setup_dir(['sklearn_pipeline.tar',
+                                 'preprocess_params.json'],
+                                VersionedTaxonomicClassifierDirFmt)
 
         obs = transformer(input)
         exp = ['params', 'pipeline']
@@ -54,7 +85,8 @@ class TestTransformers(FeatureClassifierTestPluginBase):
         self.assertSetEqual(set(obs.keys()), set(exp))
 
     def test_taxo_class_result_to_taxo_class_dir_fmt(self):
-        transformer = self.get_transformer(dict, TaxonomicClassifierDirFmt)
+        transformer = self.get_transformer(
+            dict, VersionedTaxonomicClassifierDirFmt)
         params_filepath = self.get_data_path('preprocess_params.json')
         pipeline_filepath = self.get_data_path('sklearn_pipeline.tar')
 
