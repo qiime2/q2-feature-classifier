@@ -80,7 +80,7 @@ class TestTransformers(TaxonomicClassifierTestBase):
             transformer(input)
 
     def test_old_dirfmt(self):
-        transformer = self.get_transformer(TaxonomicClassifierDirFmt, dict)
+        transformer = self.get_transformer(TaxonomicClassifierDirFmt, Pipeline)
         with open(os.path.join(self.temp_dir.name,
                                'preprocess_params.json'), 'w') as fh:
             fh.write(json.dumps([]))
