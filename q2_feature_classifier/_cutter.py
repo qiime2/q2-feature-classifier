@@ -36,6 +36,12 @@ def _primers_to_regex(f_primer, r_primer):
 def _local_aln(primer, sequence):
     best_score = None
     for one_primer in primer.expand_degenerates():
+        # `sequence` may contain degenerates. These will usually be N
+        # characters, which SSW will score as zero. Although undocumented, SSW
+        # will treat other degenerate characters as a mismatch. We acknowledge
+        # that this approach is a heuristic to finding an optimal alignment and
+        # may be revisited in the future if there's an aligner that explicitly
+        # handles degenerates.
         this_aln = \
             skbio.alignment.local_pairwise_align_ssw(one_primer, sequence)
         score = this_aln[1]

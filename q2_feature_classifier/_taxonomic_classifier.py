@@ -95,7 +95,7 @@ def _2(data: Pipeline) -> TaxonomicClassiferTemporaryPickleDirFmt:
 
 
 @plugin.register_transformer
-def _3(dirfmt: TaxonomicClassifierDirFmt) -> dict:
+def _3(dirfmt: TaxonomicClassifierDirFmt) -> Pipeline:
     raise ValueError('The scikit-learn version could not be determined for'
                      ' this artifact, please retrain your classifier for your'
                      ' current deployment to prevent data-corruption errors.')
@@ -117,7 +117,7 @@ def _5(data: dict) -> JSONFormat:
 
 # Registrations
 plugin.register_semantic_types(TaxonomicClassifier)
-plugin.register_formats(PickleFormat, TaxonomicClassifierDirFmt,
+plugin.register_formats(TaxonomicClassifierDirFmt,
                         TaxonomicClassiferTemporaryPickleDirFmt)
 plugin.register_semantic_type_to_format(
     TaxonomicClassifier,
