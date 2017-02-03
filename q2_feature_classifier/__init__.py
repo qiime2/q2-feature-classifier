@@ -11,9 +11,5 @@ import pkg_resources
 
 __version__ = pkg_resources.get_distribution('q2-feature-classifier').version
 
-
-importlib.import_module('q2_feature_classifier._classifier')
+importlib.import_module('q2_feature_classifier.classifier')
 importlib.import_module('q2_feature_classifier._cutter')
-
-
-__all__ = ['classify', 'extract_reads']
