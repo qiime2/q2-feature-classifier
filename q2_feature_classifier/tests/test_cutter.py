@@ -33,5 +33,6 @@ class CutterTests(FeatureClassifierTestPluginBase):
         inseqs = list(self.sequences.view(DNAIterator))
         outseqs = list(result.reads.view(DNAIterator))
         self.assertLessEqual(len(outseqs), len(inseqs))
+        self.assertTrue(bool(outseqs))
         for seq in outseqs:
             self.assertEqual(len(seq), length)

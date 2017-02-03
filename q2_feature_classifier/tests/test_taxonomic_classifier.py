@@ -7,11 +7,13 @@
 # ----------------------------------------------------------------------------
 
 import unittest
+import json
 import tempfile
 import tarfile
 import os
 import shutil
 
+import sklearn
 from sklearn.externals import joblib
 from sklearn.pipeline import Pipeline
 from qiime2.sdk import Artifact
@@ -19,7 +21,8 @@ from qiime2.plugins.feature_classifier.methods import \
     fit_classifier_naive_bayes
 
 from .._taxonomic_classifier import (
-    TaxonomicClassifier, TaxonomicClassifierDirFmt, PickleFormat)
+    TaxonomicClassifierDirFmt, TaxonomicClassifier,
+    TaxonomicClassiferTemporaryPickleDirFmt, PickleFormat)
 from . import FeatureClassifierTestPluginBase
 
 
@@ -36,10 +39,19 @@ class TaxonomicClassifierTestBase(FeatureClassifierTestPluginBase):
             'FeatureData[Taxonomy]', self.get_data_path('taxonomy.tsv'))
         classifier = fit_classifier_naive_bayes(reads, taxonomy)
         pipeline = classifier.classifier.view(Pipeline)
-        transformer = self.get_transformer(Pipeline, TaxonomicClassifierDirFmt)
+        transformer = self.get_transformer(
+            Pipeline, TaxonomicClassiferTemporaryPickleDirFmt)
         self._sklp = transformer(pipeline)
         sklearn_pipeline = self._sklp.sklearn_pipeline.view(PickleFormat)
         self.sklearn_pipeline = str(sklearn_pipeline)
+
+    def _custom_setup(self, version):
+        with open(os.path.join(self.temp_dir.name,
+                               'sklearn_version.json'), 'w') as fh:
+            fh.write(json.dumps({'sklearn-version': version}))
+        shutil.copy(self.sklearn_pipeline, self.temp_dir.name)
+        return TaxonomicClassiferTemporaryPickleDirFmt(
+            self.temp_dir.name, mode='r')
 
 
 class TestTypes(FeatureClassifierTestPluginBase):
@@ -48,24 +60,41 @@ class TestTypes(FeatureClassifierTestPluginBase):
 
     def test_taxonomic_classifier_semantic_type_to_format_registration(self):
         self.assertSemanticTypeRegisteredToFormat(
-            TaxonomicClassifier, TaxonomicClassifierDirFmt)
+            TaxonomicClassifier, TaxonomicClassiferTemporaryPickleDirFmt)
 
 
 class TestFormats(TaxonomicClassifierTestBase):
     def test_taxonomic_classifier_dir_fmt(self):
-        shutil.copy(self.sklearn_pipeline, self.temp_dir.name)
-        format = TaxonomicClassifierDirFmt(self.temp_dir.name, mode='r')
+        format = self._custom_setup(sklearn.__version__)
 
         # Should not error
         format.validate()
 
 
 class TestTransformers(TaxonomicClassifierTestBase):
-    def test_taxo_class_dir_fmt_to_taxo_class_result(self):
-        shutil.copy(self.sklearn_pipeline, self.temp_dir.name)
-        input = TaxonomicClassifierDirFmt(self.temp_dir.name, mode='r')
+    def test_old_sklearn_version(self):
+        transformer = self.get_transformer(
+            TaxonomicClassiferTemporaryPickleDirFmt, Pipeline)
+        input = self._custom_setup('a very old version')
+        with self.assertRaises(ValueError):
+            transformer(input)
 
-        transformer = self.get_transformer(TaxonomicClassifierDirFmt, Pipeline)
+    def test_old_dirfmt(self):
+        transformer = self.get_transformer(TaxonomicClassifierDirFmt, dict)
+        with open(os.path.join(self.temp_dir.name,
+                               'preprocess_params.json'), 'w') as fh:
+            fh.write(json.dumps([]))
+        shutil.copy(self.sklearn_pipeline, self.temp_dir.name)
+        input = TaxonomicClassifierDirFmt(
+            self.temp_dir.name, mode='r')
+        with self.assertRaises(ValueError):
+            transformer(input)
+
+    def test_taxo_class_dir_fmt_to_taxo_class_result(self):
+        input = self._custom_setup(sklearn.__version__)
+
+        transformer = self.get_transformer(
+            TaxonomicClassiferTemporaryPickleDirFmt, Pipeline)
         obs = transformer(input)
 
         self.assertTrue(obs)
@@ -83,7 +112,8 @@ class TestTransformers(TaxonomicClassifierTestBase):
             return pipeline
 
         exp = read_pipeline(self.sklearn_pipeline)
-        transformer = self.get_transformer(Pipeline, TaxonomicClassifierDirFmt)
+        transformer = self.get_transformer(
+            Pipeline, TaxonomicClassiferTemporaryPickleDirFmt)
         obs = transformer(exp)
         sklearn_pipeline = obs.sklearn_pipeline.view(PickleFormat)
         obs_pipeline = read_pipeline(str(sklearn_pipeline))

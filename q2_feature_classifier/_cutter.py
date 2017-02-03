@@ -6,6 +6,8 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+from itertools import chain
+
 from qiime2.plugin import Int, Str, Float
 from q2_types.feature_data import FeatureData, Sequence, DNAIterator
 import skbio
@@ -31,20 +33,25 @@ def _primers_to_regex(f_primer, r_primer):
                                _seq_to_regex(r_primer.reverse_complement()))
 
 
-def _aln_primer(primer, sequence, forward=True):
-    if not forward:
-        sequence = sequence.reverse_complement()
+def _local_aln(primer, sequence):
+    best_score = None
+    for one_primer in primer.expand_degenerates():
+        this_aln = \
+            skbio.alignment.local_pairwise_align_ssw(one_primer, sequence)
+        score = this_aln[1]
+        if best_score is None or score > best_score:
+            best_score = score
+            best_aln = this_aln
+    return best_aln
+
+
+def _semisemiglobal(primer, sequence, reverse=False):
+    if reverse:
+        primer = primer.reverse_complement()
 
     # locally align the primer
-    sm = skbio.alignment.make_identity_substitution_matrix(
-        2, -3, alphabet=skbio.DNA.alphabet - skbio.DNA.gap_chars)
-    dm = skbio.DNA.degenerate_map
-    for c in skbio.DNA.degenerate_chars:
-        for t in dm[c]:
-            sm[c][t] = 2
-            sm[t][c] = 2
     (aln_prim, aln_seq), score, (prim_pos, seq_pos) = \
-        skbio.alignment.local_pairwise_align_ssw(primer, sequence)
+        _local_aln(primer, sequence)
     amplicon_pos = seq_pos[1]+len(primer)-prim_pos[1]
 
     # naively extend the alignment to be semi-global
@@ -58,38 +65,52 @@ def _aln_primer(primer, sequence, forward=True):
     aln_seq = ''.join(map(str, bits))
 
     # count the matches
-    matches = sum(a != '-' and s != '-' and sm[a][s] == 2
-                  for a, s in zip(aln_prim, aln_seq))
+    matches = sum(s in skbio.DNA.degenerate_map.get(p, {p})
+                  for p, s in zip(aln_prim, aln_seq))
 
-    if not forward:
-        amplicon_pos = len(sequence) - amplicon_pos
+    if reverse:
+        amplicon_pos = max(seq_pos[0]-prim_pos[0], 0)
 
     return amplicon_pos, matches, len(aln_prim)
+
+
+def _exact_match(seq, f_primer, r_primer):
+    try:
+        regex = _primers_to_regex(f_primer, r_primer)
+        match = next(seq.find_with_regex(regex))
+        beg, end = match.start + len(f_primer), match.stop - len(r_primer)
+        return seq[beg:end]
+    except StopIteration:
+        return None
+
+
+def _approx_match(seq, f_primer, r_primer, identity):
+    beg, b_matches, b_length = _semisemiglobal(f_primer, seq)
+    end, e_matches, e_length = _semisemiglobal(r_primer, seq, reverse=True)
+    if (b_matches + e_matches) / (b_length + e_length) >= identity:
+        return seq[beg:end]
+    return None
 
 
 def _gen_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
                length: int=-1, identity: float=0.8) -> DNAIterator:
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
-    regex = _primers_to_regex(f_primer, r_primer)
     for seq in sequences:
-        try:
-            # try exact match, because it's fast and usually works
-            match = next(seq.find_with_regex(regex))
-            beg, end = match.start + len(f_primer), match.stop - len(r_primer)
-        except StopIteration:
-            # try a little bit harder with a local alignment
-            beg, b_matches, b_length = _aln_primer(f_primer, seq)
-            end, e_matches, e_length = _aln_primer(r_primer, seq,
-                                                   forward=False)
-            if (b_matches + e_matches) / (b_length + e_length) < identity:
-                continue
-        if end - beg <= 0:
+        amp = _exact_match(seq, f_primer, r_primer)
+        if not amp:
+            amp = _exact_match(seq.reverse_complement(), f_primer, r_primer)
+        if not amp:
+            amp = _approx_match(seq, f_primer, r_primer, identity)
+        if not amp:
+            amp = _approx_match(seq.reverse_complement(), f_primer, r_primer,
+                                identity)
+        if not amp:
             continue
-        if length <= 0:
-            yield seq[beg:end]
-        else:
-            yield seq[beg:min(beg + length, end)]
+        if length > 0:
+            amp = amp[:length]
+        if len(amp) > 0:
+            yield amp
 
 
 def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
@@ -115,8 +136,12 @@ def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
     q2_types.DNAIterator
         containing the reads
     """
-    return DNAIterator(_gen_reads(sequences, f_primer, r_primer, length,
-                                  identity))
+    reads = _gen_reads(sequences, f_primer, r_primer, length, identity)
+    try:
+        first_read = next(reads)
+    except StopIteration:
+        raise RuntimeError('No matches found') from None
+    return DNAIterator(chain([first_read], reads))
 
 
 plugin.methods.register_function(

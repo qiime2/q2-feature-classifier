@@ -38,7 +38,8 @@ class LowMemoryMultinomialNB(MultinomialNB):
         return self
 
 
-class MultioutputClassifier(BaseEstimator, ClassifierMixin):
+# Experimental feature. USE WITH CAUTION
+class _MultioutputClassifier(BaseEstimator, ClassifierMixin):
     # This is a hack because it looks like multioutput classifiers can't
     # handle non-numeric labels like regular classifiers.
     # TODO: raise issue linked to

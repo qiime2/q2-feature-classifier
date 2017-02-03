@@ -28,14 +28,17 @@ def _load_class(classname):
         raise ValueError(err_message)
     module, klass = classname.rsplit('.', 1)
     if module == 'custom':
-        module = importlib.import_module('._custom', 'q2_feature_classifier')
+        module = importlib.import_module('.custom', 'q2_feature_classifier')
     elif importlib.util.find_spec('.'+module, 'sklearn') is not None:
         module = importlib.import_module('.'+module, 'sklearn')
     else:
         raise ValueError(err_message)
     if not hasattr(module, klass):
         raise ValueError(err_message)
-    return getattr(module, klass)
+    klass = getattr(module, klass)
+    if not issubclass(klass, sklearn.base.BaseEstimator):
+        raise ValueError(err_message)
+    return klass
 
 
 def spec_from_pipeline(pipeline):
@@ -63,8 +66,6 @@ def spec_from_pipeline(pipeline):
                             pass
 
                 module = obj.__module__
-                if module == 'q2_feature_classifier._custom':
-                    module = 'q2_feature_classifier.custom'
                 type = module + '.' + obj.__class__.__name__
                 encoded['__type__'] = type.split('.', 1)[1]
                 return encoded
@@ -122,7 +123,7 @@ def classify(reads: DNAIterator, classifier: Pipeline,
                           confidence=confidence)
     result = list(zip(*predictions))
     if len(result) == 0:
-        seq_ids, taxonomy, confidence = [[]]*3
+        seq_ids, taxonomy, confidence = [], [], []
     else:
         seq_ids, taxonomy, confidence = result
     result = pd.DataFrame({'Taxon': taxonomy, 'Confidence': confidence},
@@ -155,7 +156,7 @@ def _pipeline_signature(spec):
     signature_params = []
     pipeline = pipeline_from_spec(spec)
     params = pipeline.get_params()
-    for param, default in params.items():
+    for param, default in sorted(params.items()):
         try:
             json.dumps(default)
         except TypeError:

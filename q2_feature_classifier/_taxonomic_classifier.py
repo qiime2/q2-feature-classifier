@@ -10,6 +10,7 @@ import json
 import tarfile
 import os
 
+import sklearn
 from sklearn.externals import joblib
 from sklearn.pipeline import Pipeline
 import qiime2.plugin
@@ -41,14 +42,27 @@ class JSONFormat(model.TextFileFormat):
 
 
 class TaxonomicClassifierDirFmt(model.DirectoryFormat):
+    preprocess_params = model.File('preprocess_params.json', format=JSONFormat)
+    sklearn_pipeline = model.File('sklearn_pipeline.tar', format=PickleFormat)
+
+
+class TaxonomicClassiferTemporaryPickleDirFmt(model.DirectoryFormat):
+    version_info = model.File('sklearn_version.json', format=JSONFormat)
     sklearn_pipeline = model.File('sklearn_pipeline.tar', format=PickleFormat)
 
 
 # Transformers
 @plugin.register_transformer
-def _1(dirfmt: TaxonomicClassifierDirFmt) -> Pipeline:
-    # Note: the next two lines will likely disappear when cleanup of the
-    # views/transformers API takes place.
+def _1(dirfmt: TaxonomicClassiferTemporaryPickleDirFmt) -> Pipeline:
+    sklearn_version = dirfmt.version_info.view(dict)['sklearn-version']
+    if sklearn_version != sklearn.__version__:
+        raise ValueError('The scikit-learn version (%s) used to generate this'
+                         ' artifact does not match the current version'
+                         ' of scikit-learn installed (%s). Please retrain your'
+                         ' classifier for your current deployment to prevent'
+                         ' data-corruption errors.'
+                         % (sklearn_version, sklearn.__version__))
+
     sklearn_pipeline = dirfmt.sklearn_pipeline.view(PickleFormat)
 
     with tarfile.open(str(sklearn_pipeline)) as tar:
@@ -63,7 +77,7 @@ def _1(dirfmt: TaxonomicClassifierDirFmt) -> Pipeline:
 
 
 @plugin.register_transformer
-def _2(data: Pipeline) -> TaxonomicClassifierDirFmt:
+def _2(data: Pipeline) -> TaxonomicClassiferTemporaryPickleDirFmt:
     sklearn_pipeline = PickleFormat()
     with tarfile.open(str(sklearn_pipeline), 'w') as tar:
         tmpdir = model.DirectoryFormat()
@@ -72,14 +86,39 @@ def _2(data: Pipeline) -> TaxonomicClassifierDirFmt:
             tar.add(fn, os.path.basename(fn))
             os.unlink(fn)
 
-    dirfmt = TaxonomicClassifierDirFmt()
+    dirfmt = TaxonomicClassiferTemporaryPickleDirFmt()
+    dirfmt.version_info.write_data(
+        {'sklearn-version': sklearn.__version__}, dict)
     dirfmt.sklearn_pipeline.write_data(sklearn_pipeline, PickleFormat)
 
     return dirfmt
 
 
+@plugin.register_transformer
+def _3(dirfmt: TaxonomicClassifierDirFmt) -> dict:
+    raise ValueError('The scikit-learn version could not be determined for'
+                     ' this artifact, please retrain your classifier for your'
+                     ' current deployment to prevent data-corruption errors.')
+
+
+@plugin.register_transformer
+def _4(fmt: JSONFormat) -> dict:
+    with fmt.open() as fh:
+        return json.load(fh)
+
+
+@plugin.register_transformer
+def _5(data: dict) -> JSONFormat:
+    result = JSONFormat()
+    with result.open() as fh:
+        json.dump(data, fh)
+    return result
+
+
 # Registrations
 plugin.register_semantic_types(TaxonomicClassifier)
-plugin.register_formats(PickleFormat, JSONFormat, TaxonomicClassifierDirFmt)
+plugin.register_formats(PickleFormat, TaxonomicClassifierDirFmt,
+                        TaxonomicClassiferTemporaryPickleDirFmt)
 plugin.register_semantic_type_to_format(
-    TaxonomicClassifier, artifact_format=TaxonomicClassifierDirFmt)
+    TaxonomicClassifier,
+    artifact_format=TaxonomicClassiferTemporaryPickleDirFmt)
