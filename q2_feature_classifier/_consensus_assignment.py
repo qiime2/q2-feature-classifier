@@ -30,16 +30,14 @@ def _consensus_assignments(cmd, ref_taxa, t_delim=';', min_consensus=0.51,
         return result
 
 
-def _parse_params(dict_of_params):
-    '''Parse optional parameters, passed as dict, to command-line commands.
+def _parse_params(str_of_params):
+    '''Parse optional parameters, passed as str, to command-line commands.
     This allows additional parameters to be input and passed to the CLI.
     '''
     params = []
     # allow passing of additional BLAST parameters
-    if dict_of_params is not None:
-        for k, v in dict_of_params.items():
-            params.append(k)
-            params.append(v)
+    if str_of_params is not None:
+        params = str_of_params.split(',')
     return params
 
 

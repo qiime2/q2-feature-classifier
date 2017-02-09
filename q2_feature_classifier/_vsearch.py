@@ -51,10 +51,11 @@ plugin.methods.register_function(
                             'min_consensus': 'Minimum fraction of assignments'
                             'must match top hit to be accepted as consensus'
                             'assignment. Must be in range [0.5 - 1.0]',
-                            'params': 'Dict of additional command-line'
-                            'parameters to use during assignment, where keys'
-                            'are parameter names and values are parameter'
-                            'values. Enter in exactly as they should be passed'
-                            'to command line.'
+                            'params': 'comma-separated list of additional '
+                            'command-line parameters and their values to use '
+                            'during assignment. Parameters and their values '
+                            'must be passed consecutively, and entered exactly'
+                            ' as they should be passed to command line,'
+                            'without spaces. E.g., "-evalue,10,-strand,both".'
                             }
 )
