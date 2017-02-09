@@ -13,3 +13,5 @@ __version__ = pkg_resources.get_distribution('q2-feature-classifier').version
 
 importlib.import_module('q2_feature_classifier.classifier')
 importlib.import_module('q2_feature_classifier._cutter')
+importlib.import_module('q2_feature_classifier._blast')
+importlib.import_module('q2_feature_classifier._vsearch')
