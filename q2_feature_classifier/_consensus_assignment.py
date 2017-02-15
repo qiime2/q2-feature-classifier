@@ -20,7 +20,8 @@ def _consensus_assignments(cmd, ref_taxa, t_delim=';', min_consensus=0.51,
         cmd = cmd + [output.name]
         _run_command(cmd)
         obs_taxa = _import_blast_assignments(
-            output.name, ref_taxa, t_delim=t_delim)
+            output.name, ref_taxa, t_delim=t_delim,
+            unassignable_label=unassignable_label)
         consensus = _compute_consensus_annotations(
             obs_taxa, min_consensus=min_consensus, t_delim=t_delim,
             unassignable_label=unassignable_label)
@@ -54,7 +55,7 @@ def _run_command(cmd, verbose=True):
 
 
 def _import_blast_assignments(assignments, ref_taxa, f_delim='\t',
-                              t_delim=';'):
+                              t_delim=';', unassignable_label="Unassigned"):
     '''import observed assignments to dict of lists.
 
     assignments: path or list
@@ -90,7 +91,12 @@ def _import_blast_assignments(assignments, ref_taxa, f_delim='\t',
             try:
                 t = ref_taxa[i[1]].split(t_delim)
             except KeyError:
-                t = ref_taxa[int(i[1])].split(t_delim)
+                try:
+                    t = ref_taxa[int(i[1])].split(t_delim)
+                # if vsearch fails to find assignment, it reports '*' as the
+                # accession ID, which is completely useless and unproductive.
+                except ValueError:
+                    t = unassignable_label
             if i[0] in obs_taxa.keys():
                 obs_taxa[i[0]].append(t)
             else:
