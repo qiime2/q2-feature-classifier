@@ -13,33 +13,59 @@ from os.path import isfile
 from collections import Counter
 
 
-def _consensus_assignments(cmd, ref_taxa, t_delim=';', min_consensus=0.51,
-                           unassignable_label="Unassigned"):
-    '''Run command on CL and find consensus taxonomy.'''
+def _get_default_unassignable_label():
+    return "Unassigned"
+
+
+def _consensus_assignments(
+        cmd, ref_taxa, min_consensus=0.51, output_no_hits=False,
+        exp_seq_ids=None,
+        unassignable_label=_get_default_unassignable_label()):
+    '''Run command line subprocess and find consensus taxonomy.'''
     with tempfile.NamedTemporaryFile() as output:
         cmd = cmd + [output.name]
         _run_command(cmd)
         obs_taxa = _import_blast_assignments(
-            output.name, ref_taxa, t_delim=t_delim,
-            unassignable_label=unassignable_label)
+            output.name, ref_taxa, unassignable_label=unassignable_label)
         consensus = _compute_consensus_annotations(
-            obs_taxa, min_consensus=min_consensus, t_delim=t_delim,
+            obs_taxa, min_consensus=min_consensus,
             unassignable_label=unassignable_label)
+        # If output_no_hits=True, find/add query IDs missing from consensus
+        if output_no_hits is True:
+            consensus = _output_no_hits(
+                consensus, exp_seq_ids, unassignable_label)
+        # if there are no consensus results (no hits for any query), default
+        # to empty result file (must create empty dict or fail on pd error)
+        if not consensus:
+            consensus = {'': ('', '')}
         result = pd.DataFrame.from_dict(consensus, 'index')
         result.index.name = 'Feature ID'
         result.columns = ['Taxon', 'Confidence']
         return result
 
 
-def _parse_params(str_of_params):
-    '''Parse optional parameters, passed as str, to command-line commands.
-    This allows additional parameters to be input and passed to the CLI.
-    '''
-    params = []
-    # allow passing of additional BLAST parameters
-    if str_of_params is not None:
-        params = str_of_params.split(',')
-    return params
+def _validate_params(min_id, maxaccepts, min_consensus):
+    if min_id > 1.0 or min_id <= 0.0:
+        raise ValueError('min_id must be > 0 and <= 1')
+    if maxaccepts < 1:
+        raise ValueError('maxaccepts must be >= 1')
+    if min_consensus > 1.0 or min_consensus <= 0.5:
+        raise ValueError('min_consensus must be > 0.51 and <= 1.0')
+
+
+def _output_no_hits(obs_taxa, exp_seq_ids,
+                    unassignable_label=_get_default_unassignable_label()):
+    '''If a query ID has no hits, report as unassigned.'''
+    # extract list of query sequence IDs
+    exp = _open_list_or_file(exp_seq_ids)
+    exp = [line.strip('>') for line in exp if line.startswith('>')]
+
+    # iterate over expected IDs, add as unassigned to obs_taxa if missing
+    for _id in exp:
+        if _id not in obs_taxa:
+            obs_taxa[_id] = (unassignable_label, 0.0)
+
+    return obs_taxa
 
 
 def _run_command(cmd, verbose=True):
@@ -54,8 +80,9 @@ def _run_command(cmd, verbose=True):
     subprocess.run(cmd, check=True)
 
 
-def _import_blast_assignments(assignments, ref_taxa, f_delim='\t',
-                              t_delim=';', unassignable_label="Unassigned"):
+def _import_blast_assignments(
+        assignments, ref_taxa,
+        unassignable_label=_get_default_unassignable_label()):
     '''import observed assignments to dict of lists.
 
     assignments: path or list
@@ -66,37 +93,25 @@ def _import_blast_assignments(assignments, ref_taxa, f_delim='\t',
     ref_taxa: dict or pd.Series
         Reference taxonomies in tab-delimited format:
             <accession ID>  kingdom;phylum;class;order;family;genus;species
-
-    f_delim: str
-        Field delimiter separating columns in file.
-
-    t_delim: str
-        Taxonomy delimiter separating taxonomic levels in taxonomy assignments.
     '''
     obs_taxa = {}
-
-    # accept assignments as list or file
-    if isinstance(assignments, list):
-        lines = assignments
-    elif isfile(assignments):
-        with open(assignments, "r") as inputfile:
-            lines = [line.strip() for line in inputfile]
+    lines = _open_list_or_file(assignments)
 
     for line in lines:
         if not line.startswith('#') or line == "":
-            i = line.split(f_delim)
+            i = line.split('\t')
             # ref taxonomy IDs get imported as a str when using CLI
             # but imported as int in python interpreter (e.g., during tests)
             # the following allows dict lookup as str or int.
             try:
-                t = ref_taxa[i[1]].split(t_delim)
-            except KeyError:
+                t = ref_taxa[i[1]].split(';')
+            except (KeyError, TypeError):
                 try:
-                    t = ref_taxa[int(i[1])].split(t_delim)
+                    t = ref_taxa[int(i[1])].split(';')
                 # if vsearch fails to find assignment, it reports '*' as the
                 # accession ID, which is completely useless and unproductive.
                 except ValueError:
-                    t = unassignable_label
+                    t = [unassignable_label]
             if i[0] in obs_taxa.keys():
                 obs_taxa[i[0]].append(t)
             else:
@@ -104,18 +119,20 @@ def _import_blast_assignments(assignments, ref_taxa, f_delim='\t',
     return obs_taxa
 
 
-def _import_taxonomy_to_dict(infile):
-    ''' taxonomy file -> dict'''
-    with open(infile, "r") as inputfile:
-        lines = {line.strip().split('\t')[0]: line.strip().split('\t')[1]
-                 for line in inputfile}
+def _open_list_or_file(infile):
+    if isinstance(infile, list):
+        lines = infile
+    elif isfile(infile):
+        with open(infile, "r") as inputfile:
+            lines = [line.strip() for line in inputfile]
     return lines
 
 
-def _compute_consensus_annotations(query_annotations,
-                                   min_consensus,
-                                   t_delim=';',
-                                   unassignable_label="Unassigned"):
+# This code has been ported and adapted from QIIME 1.9.1 with permission from
+# @gregcaporaso.
+def _compute_consensus_annotations(
+        query_annotations, min_consensus,
+        unassignable_label=_get_default_unassignable_label()):
     """
         Parameters
         ----------
@@ -128,18 +145,17 @@ def _compute_consensus_annotations(query_annotations,
             Keys are query identifiers, and values are the consensus of the
             input taxonomic annotations.
     """
-    # This code has been ported and adapted from QIIME 1.9.1 with
-    # permission from @gregcaporaso.
     result = {}
     for query_id, annotations in query_annotations.items():
         consensus_annotation, consensus_fraction = \
             _compute_consensus_annotation(annotations, min_consensus,
                                           unassignable_label)
         result[query_id] = (
-            t_delim.join(consensus_annotation), consensus_fraction)
+            ';'.join(consensus_annotation), consensus_fraction)
     return result
 
 
+# This code has been ported from QIIME 1.9.1 with permission from @gregcaporaso
 def _compute_consensus_annotation(annotations, min_consensus,
                                   unassignable_label):
     """ Compute the consensus of a collection of annotations
@@ -161,8 +177,6 @@ def _compute_consensus_annotation(annotations, min_consensus,
             Fraction of input annotations that agreed at the deepest
             level of assignment
     """
-    # This code has been ported from QIIME 1.9.1 with
-    # permission from @gregcaporaso.
     if min_consensus <= 0.5:
         raise ValueError("min_consensus must be greater than 0.5.")
     num_input_annotations = len(annotations)

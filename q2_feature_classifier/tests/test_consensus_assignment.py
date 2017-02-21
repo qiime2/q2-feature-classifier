@@ -12,7 +12,9 @@ from q2_feature_classifier._vsearch import vsearch
 from q2_feature_classifier._consensus_assignment import (
     _compute_consensus_annotation,
     _compute_consensus_annotations,
-    _import_blast_assignments)
+    _import_blast_assignments,
+    _output_no_hits,
+    _validate_params)
 from q2_types.feature_data import DNAFASTAFormat
 from . import FeatureClassifierTestPluginBase
 
@@ -66,10 +68,8 @@ class ImportBlastAssignmentTests(FeatureClassifierTestPluginBase):
         self.assertEqual(obs, exp)
 
 
+# This code has been ported from QIIME 1.9.1 with permission from @gregcaporaso
 class ConsensusAnnotationTests(FeatureClassifierTestPluginBase):
-
-    # This code has been ported from QIIME 1.9.1 with
-    # permission from @gregcaporaso.
 
     def test_varied_min_fraction(self):
         in_ = [['Ab', 'Bc', 'De'],
@@ -176,10 +176,8 @@ class ConsensusAnnotationTests(FeatureClassifierTestPluginBase):
         self.assertEqual(actual, expected)
 
 
+# This code has been ported from QIIME 1.9.1 with permission from @gregcaporaso
 class ConsensusAnnotationsTests(FeatureClassifierTestPluginBase):
-
-    # This code has been ported from QIIME 1.9.1 with
-    # permission from @gregcaporaso.
 
     def test_varied_fraction(self):
 
@@ -216,10 +214,43 @@ class ConsensusAnnotationsTests(FeatureClassifierTestPluginBase):
                'q3': [[]],
                'q4': [[]],
                'q5': [[]]}
-        expected = {'q1': ('A|B|C', 1.0),
-                    'q2': ('A|H|I|J', 2. / 3.),
+        expected = {'q1': ('A;B;C', 1.0),
+                    'q2': ('A;H;I;J', 2. / 3.),
                     'q3': ('x', 1.0),
                     'q4': ('x', 1.0),
                     'q5': ('x', 1.0)}
-        actual = _compute_consensus_annotations(in_, 0.51, "|", "x")
+        actual = _compute_consensus_annotations(in_, 0.51, "x")
         self.assertEqual(actual, expected)
+
+
+class OutputNoHitsTests(FeatureClassifierTestPluginBase):
+
+    def test_output_no_hits(self):
+        exp = ['>A111', 'ACGTGTGATCGA',
+               '>A112', 'ACTGTCATGTGA',
+               '>A113', 'ACTGTGTCGTGA']
+        obs = {'A111': ('A;B;C;D', 1.0)}
+        res = {'A111': ('A;B;C;D', 1.0),
+               'A112': ('Unassigned', 0.0),
+               'A113': ('Unassigned', 0.0)}
+        consensus = _output_no_hits(obs, exp)
+        self.assertEqual(consensus, res)
+
+
+class ValidateParamsTests(FeatureClassifierTestPluginBase):
+
+    def test_validate_params(self):
+        with self.assertRaises(ValueError):
+            _validate_params(0.0, 1, 0.51)
+        with self.assertRaises(ValueError):
+            _validate_params(-1, 1, 0.51)
+        with self.assertRaises(ValueError):
+            _validate_params(2.0, 1, 0.51)
+        with self.assertRaises(ValueError):
+            _validate_params(0.9, 0, 0.51)
+        with self.assertRaises(ValueError):
+            _validate_params(0.9, 1, 0.50)
+        with self.assertRaises(ValueError):
+            _validate_params(0.9, 1, -1)
+        with self.assertRaises(ValueError):
+            _validate_params(0.9, 1, 2.0)

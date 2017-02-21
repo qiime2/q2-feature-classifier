@@ -7,7 +7,9 @@
 # ----------------------------------------------------------------------------
 
 import pandas as pd
-from ._consensus_assignment import _consensus_assignments, _parse_params
+from ._consensus_assignment import (_consensus_assignments,
+                                    _get_default_unassignable_label,
+                                    _validate_params)
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAFASTAFormat)
 from .plugin_setup import plugin
@@ -16,19 +18,19 @@ from qiime2.plugin import Int, Str, Float
 
 def vsearch(query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
             reference_taxonomy: pd.Series, maxaccepts: int=10, min_id: int=0.8,
-            strand: str='both', t_delim: str=';', params: str=None,
-            min_consensus: float=0.51, unassignable_label: str="Unassigned",
+            strand: str='both', min_consensus: float=0.51,
+            unassignable_label: str=_get_default_unassignable_label(),
             num_threads: str=1) -> pd.DataFrame:
 
-    params = _parse_params(params)
+    _validate_params(min_id, maxaccepts, min_consensus)
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
     cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(min_id),
            '--strand', strand, '--maxaccepts', str(maxaccepts),
            '--maxrejects', '0', '--output_no_hits', '--db', ref_fp,
-           '--threads', str(num_threads), *params, '--blast6out']
+           '--threads', str(num_threads), '--blast6out']
     consensus = _consensus_assignments(
-        cmd, reference_taxonomy, t_delim=t_delim, min_consensus=min_consensus,
+        cmd, reference_taxonomy, min_consensus=min_consensus,
         unassignable_label=unassignable_label)
     return consensus
 
@@ -39,23 +41,24 @@ plugin.methods.register_function(
             'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': FeatureData[Taxonomy]},
     parameters={'maxaccepts': Int, 'min_id': Float, 'strand': Str,
-                't_delim': Str, 'params': Str, 'min_consensus': Float,
-                'unassignable_label': Str, 'num_threads': Int},
+                'min_consensus': Float, 'unassignable_label': Str,
+                'num_threads': Int},
     outputs=[('classification', FeatureData[Taxonomy])],
-    name='Assign taxonomy using VSEARCH.',
-    description='Assign taxonomy to query sequences using VSEARCH.',
-    parameter_descriptions={'strand': 'plus|both', 'maxaccepts': 'Maximum'
-                            'number of hits to keep for each query',
-                            'min_id': 'Reject match if percent identity to'
-                            'query is lower. Range [0.0 - 1.0]',
-                            'min_consensus': 'Minimum fraction of assignments'
-                            'must match top hit to be accepted as consensus'
-                            'assignment. Must be in range [0.5 - 1.0]',
-                            'params': 'comma-separated list of additional '
-                            'command-line parameters and their values to use '
-                            'during assignment. Parameters and their values '
-                            'must be passed consecutively, and entered exactly'
-                            ' as they should be passed to command line,'
-                            'without spaces. E.g., "-evalue,10,-strand,both".'
-                            }
+    input_descriptions={'query': 'Sequences to classify taxonomically.',
+                        'reference_reads': 'reference sequences.',
+                        'reference_taxonomy': 'reference taxonomy labels.'},
+    parameter_descriptions={
+        'strand': 'plus|both',
+        'maxaccepts': ('Maximum number of hits to keep for each query. Must be'
+                       '>= 1'),
+        'min_id': 'Reject match if percent identity to query is lower. Range '
+        '[0.0 - 1.0]',
+        'min_consensus': ('Minimum fraction of assignments must match top hit'
+                          'to be accepted as consensus assignment. Must be in'
+                          'range [0.51 - 1.0]')
+    },
+    output_descriptions={'classification': 'The resulting taxonomy '
+                         'classifications.'},
+    name='VSEARCH consensus taxonomy classifier',
+    description='Assign taxonomy to query sequences using VSEARCH.'
 )
