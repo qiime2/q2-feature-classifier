@@ -13,8 +13,7 @@ from q2_feature_classifier._consensus_assignment import (
     _compute_consensus_annotation,
     _compute_consensus_annotations,
     _import_blast_assignments,
-    _output_no_hits,
-    _validate_params)
+    _output_no_hits)
 from q2_types.feature_data import DNAFASTAFormat
 from . import FeatureClassifierTestPluginBase
 
@@ -62,6 +61,7 @@ class ImportBlastAssignmentTests(FeatureClassifierTestPluginBase):
                '112': 'Aa;Bb;Cc',
                '113': 'Aa;Dd;Ee',
                '114': 'Aa;Dd;Ff'}
+        ref = pd.Series(ref)
         obs = _import_blast_assignments(in_, ref)
         exp = {'s1': [['Aa', 'Bb', 'Cc'], ['Aa', 'Bb', 'Cc']],
                's2': [['Aa', 'Dd', 'Ee'], ['Aa', 'Dd', 'Ff']]}
@@ -235,22 +235,3 @@ class OutputNoHitsTests(FeatureClassifierTestPluginBase):
                'A113': ('Unassigned', 0.0)}
         consensus = _output_no_hits(obs, exp)
         self.assertEqual(consensus, res)
-
-
-class ValidateParamsTests(FeatureClassifierTestPluginBase):
-
-    def test_validate_params(self):
-        with self.assertRaises(ValueError):
-            _validate_params(0.0, 1, 0.51)
-        with self.assertRaises(ValueError):
-            _validate_params(-1, 1, 0.51)
-        with self.assertRaises(ValueError):
-            _validate_params(2.0, 1, 0.51)
-        with self.assertRaises(ValueError):
-            _validate_params(0.9, 0, 0.51)
-        with self.assertRaises(ValueError):
-            _validate_params(0.9, 1, 0.50)
-        with self.assertRaises(ValueError):
-            _validate_params(0.9, 1, -1)
-        with self.assertRaises(ValueError):
-            _validate_params(0.9, 1, 2.0)

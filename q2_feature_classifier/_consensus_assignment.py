@@ -44,15 +44,6 @@ def _consensus_assignments(
         return result
 
 
-def _validate_params(min_id, maxaccepts, min_consensus):
-    if min_id > 1.0 or min_id <= 0.0:
-        raise ValueError('min_id must be > 0 and <= 1')
-    if maxaccepts < 1:
-        raise ValueError('maxaccepts must be >= 1')
-    if min_consensus > 1.0 or min_consensus <= 0.5:
-        raise ValueError('min_consensus must be > 0.51 and <= 1.0')
-
-
 def _output_no_hits(obs_taxa, exp_seq_ids,
                     unassignable_label=_get_default_unassignable_label()):
     '''If a query ID has no hits, report as unassigned.'''
@@ -68,6 +59,8 @@ def _output_no_hits(obs_taxa, exp_seq_ids,
     return obs_taxa
 
 
+# Replace this function with QIIME2 API for wrapping commands/binaries,
+# pending https://github.com/qiime2/qiime2/issues/224
 def _run_command(cmd, verbose=True):
     if verbose:
         print("Running external command line application. This may print "
@@ -83,7 +76,7 @@ def _run_command(cmd, verbose=True):
 def _import_blast_assignments(
         assignments, ref_taxa,
         unassignable_label=_get_default_unassignable_label()):
-    '''import observed assignments to dict of lists.
+    '''import observed assignments in blast6 format to dict of lists.
 
     assignments: path or list
         Taxonomy observation map in blast format 6 or 7. Each line consists of
@@ -99,23 +92,39 @@ def _import_blast_assignments(
 
     for line in lines:
         if not line.startswith('#') or line == "":
-            i = line.split('\t')
-            # ref taxonomy IDs get imported as a str when using CLI
-            # but imported as int in python interpreter (e.g., during tests)
-            # the following allows dict lookup as str or int.
-            try:
-                t = ref_taxa[i[1]].split(';')
-            except (KeyError, TypeError):
-                try:
-                    t = ref_taxa[int(i[1])].split(';')
-                # if vsearch fails to find assignment, it reports '*' as the
-                # accession ID, which is completely useless and unproductive.
-                except ValueError:
-                    t = [unassignable_label]
-            if i[0] in obs_taxa.keys():
-                obs_taxa[i[0]].append(t)
+            fields = line.split('\t')
+            # if vsearch fails to find assignment, it reports '*' as the
+            # accession ID, which is completely useless and unproductive.
+            if fields[1] == '*':
+                t = [unassignable_label]
             else:
-                obs_taxa[i[0]] = [t]
+                # ref taxonomy IDs get imported as a str when using CLI
+                # but imported as int in python interpreter (e.g., for tests)
+                # the following allows dict lookup as str or int.
+                if ref_taxa.index.dtype == int:
+                    id_ = int(fields[1])
+                else:
+                    id_ = fields[1]
+
+                try:
+                    t = ref_taxa[id_]
+                except KeyError:
+                    raise KeyError((
+                        'Identifier {0} was reported in taxonomic search '
+                        'results, but was not present in the reference '
+                        'taxonomy.').format(str(id_)))
+
+                try:
+                    t = t.split(';')
+                except ValueError:
+                    raise ValueError((
+                        'Reference taxonomy {0} (id: {1}) is incorrectly '
+                        'formatted.').format(t, str(id_)))
+
+            if fields[0] in obs_taxa.keys():
+                obs_taxa[fields[0]].append(t)
+            else:
+                obs_taxa[fields[0]] = [t]
     return obs_taxa
 
 

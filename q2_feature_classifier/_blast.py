@@ -11,12 +11,11 @@ import pandas as pd
 from os.path import join
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAFASTAFormat)
-from qiime2.plugin import Int, Str, Float
+from qiime2.plugin import Int, Str, Float, Choices, Range
 from .plugin_setup import plugin
 from ._consensus_assignment import (_consensus_assignments,
                                     _get_default_unassignable_label,
-                                    _run_command,
-                                    _validate_params)
+                                    _run_command)
 
 
 def blast(query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
@@ -26,7 +25,6 @@ def blast(query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
           unassignable_label: str=_get_default_unassignable_label(),
           num_threads: str=1) -> pd.DataFrame:
 
-    _validate_params(min_id, maxaccepts, min_consensus)
     min_id = min_id * 100
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
@@ -55,26 +53,34 @@ plugin.methods.register_function(
     inputs={'query': FeatureData[Sequence],
             'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': FeatureData[Taxonomy]},
-    parameters={'evalue': Float, 'maxaccepts': Int, 'min_id': Float,
-                'strand': Str, 'min_consensus': Float,
-                'unassignable_label': Str, 'num_threads': Int},
+    parameters={'evalue': Float,
+                'maxaccepts': Int % Range(1, None),
+                'min_id': Float % Range(0.0, 1.0, inclusive_end=True),
+                'strand': Str % Choices(['both', 'plus', 'minus']),
+                'min_consensus': Float % Range(0.51, 1.0, inclusive_end=True),
+                'unassignable_label': Str,
+                'num_threads': Int},
     outputs=[('classification', FeatureData[Taxonomy])],
     input_descriptions={'query': 'Sequences to classify taxonomically.',
                         'reference_reads': 'reference sequences.',
                         'reference_taxonomy': 'reference taxonomy labels.'},
-    name='BLAST+ consensus taxonomy classifier',
-    description='Assign taxonomy to query sequences using BLAST+.',
     parameter_descriptions={
         'evalue': 'BLAST expectation value (E) threshold for saving hits.',
-        'strand': ('Align against reference sequences in forward direction or'
-                   ' both directions. Must be "plus" or "both".'),
+        'strand': ('Align against reference sequences in forward ("plus"), '
+                   'reverse ("minus"), or both directions ("both").'),
         'maxaccepts': ('Maximum number of hits to keep for each query. Must be'
-                       ' >= 1'),
+                       ' in range [0, infinity].'),
         'min_id': ('Reject match if percent identity to query is lower. Must '
-                   'be in range 0.0 - 1.0'),
+                   'be in range [0.0 - 1.0].'),
         'min_consensus': ('Minimum fraction of assignments must match top hit'
                           'to be accepted as consensus assignment. Must be in'
-                          'range [0.51 - 1.0]')},
+                          'range [0.51 - 1.0].')},
     output_descriptions={
-        'classification': 'Taxonomy classifications of query sequences.'}
+        'classification': 'Taxonomy classifications of query sequences.'},
+    name='BLAST+ consensus taxonomy classifier',
+    description=('Assign taxonomy to query sequences using BLAST+. Performs'
+                 'BLAST+ local alignment between query and reference_reads,'
+                 'then assigns consensus taxonomy to each query sequence from '
+                 'among maxaccepts top hits, min_consensus of which share that'
+                 ' taxonomic assignment.')
 )
