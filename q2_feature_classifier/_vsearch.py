@@ -41,7 +41,8 @@ plugin.methods.register_function(
     parameters={'maxaccepts': Int % Range(1, None),
                 'min_id': Float % Range(0.0, 1.0, inclusive_end=True),
                 'strand': Str % Choices(['both', 'plus']),
-                'min_consensus': Float % Range(0.51, 1.0, inclusive_end=True),
+                'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
+                                               inclusive_start=False),
                 'unassignable_label': Str,
                 'num_threads': Int},
     outputs=[('classification', FeatureData[Taxonomy])],
@@ -51,20 +52,20 @@ plugin.methods.register_function(
     parameter_descriptions={
         'strand': ('Align against reference sequences in forward ("plus") '
                    'or both directions ("both").'),
-        'maxaccepts': ('Maximum number of hits to keep for each query. Must be'
-                       ' in range [0, infinity].'),
+        'maxaccepts': ('Maximum number of hits to keep for each query. Must '
+                       'be in range [0, infinity].'),
         'min_id': 'Reject match if percent identity to query is lower. Must '
-                  'be in range [0.0 - 1.0].',
-        'min_consensus': ('Minimum fraction of assignments must match top hit'
-                          'to be accepted as consensus assignment. Must be in'
-                          'range [0.51 - 1.0].')
+                  'be in range [0.0, 1.0].',
+        'min_consensus': ('Minimum fraction of assignments must match top '
+                          'hit to be accepted as consensus assignment. Must '
+                          'be in range (0.5, 1.0].')
     },
     output_descriptions={'classification': 'The resulting taxonomy '
                          'classifications.'},
     name='VSEARCH consensus taxonomy classifier',
-    description=('Assign taxonomy to query sequences using VSEARCH. Performs'
-                 'VSEARCH global alignment between query and reference_reads,'
+    description=('Assign taxonomy to query sequences using VSEARCH. Performs '
+                 'VSEARCH global alignment between query and reference_reads, '
                  'then assigns consensus taxonomy to each query sequence from '
-                 'among maxaccepts top hits, min_consensus of which share that'
-                 ' taxonomic assignment.')
+                 'among maxaccepts top hits, min_consensus of which share '
+                 'that taxonomic assignment.')
 )
