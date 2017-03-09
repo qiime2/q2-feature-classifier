@@ -12,7 +12,7 @@ from q2_feature_classifier._vsearch import vsearch
 from q2_feature_classifier._consensus_assignment import (
     _compute_consensus_annotation,
     _compute_consensus_annotations,
-    _import_blast_assignments,
+    _import_blast_format_assignments,
     _output_no_hits)
 from q2_types.feature_data import DNAFASTAFormat
 from . import FeatureClassifierTestPluginBase
@@ -51,7 +51,7 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
 
 class ImportBlastAssignmentTests(FeatureClassifierTestPluginBase):
 
-    def test_import_blast_assignments(self):
+    def test_import_blast_format_assignments(self):
         in_ = ['# This is a blast comment line',
                's1\t111\t100.000\t1428\t0\t0\t1\t1428\t1\t1428\t0.0\t2638',
                's1\t112\t100.000\t1479\t0\t0\t1\t1479\t1\t1479\t0.0\t2732',
@@ -62,7 +62,7 @@ class ImportBlastAssignmentTests(FeatureClassifierTestPluginBase):
                '113': 'Aa;Dd;Ee',
                '114': 'Aa;Dd;Ff'}
         ref = pd.Series(ref)
-        obs = _import_blast_assignments(in_, ref)
+        obs = _import_blast_format_assignments(in_, ref)
         exp = {'s1': [['Aa', 'Bb', 'Cc'], ['Aa', 'Bb', 'Cc']],
                's2': [['Aa', 'Dd', 'Ee'], ['Aa', 'Dd', 'Ff']]}
         self.assertEqual(obs, exp)

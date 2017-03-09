@@ -16,17 +16,17 @@ from ._consensus_assignment import (_consensus_assignments,
 
 
 def vsearch(query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
-            reference_taxonomy: pd.Series, maxaccepts: int=10, min_id: int=0.8,
+            reference_taxonomy: pd.Series, maxaccepts: int=10, id_: int=0.8,
             strand: str='both', min_consensus: float=0.51,
             unassignable_label: str=_get_default_unassignable_label(),
-            num_threads: str=1) -> pd.DataFrame:
+            threads: str=1) -> pd.DataFrame:
 
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
-    cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(min_id),
+    cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(id_),
            '--strand', strand, '--maxaccepts', str(maxaccepts),
            '--maxrejects', '0', '--output_no_hits', '--db', ref_fp,
-           '--threads', str(num_threads), '--blast6out']
+           '--threads', str(threads), '--blast6out']
     consensus = _consensus_assignments(
         cmd, reference_taxonomy, min_consensus=min_consensus,
         unassignable_label=unassignable_label)
@@ -39,12 +39,12 @@ plugin.methods.register_function(
             'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': FeatureData[Taxonomy]},
     parameters={'maxaccepts': Int % Range(1, None),
-                'min_id': Float % Range(0.0, 1.0, inclusive_end=True),
+                'id_': Float % Range(0.0, 1.0, inclusive_end=True),
                 'strand': Str % Choices(['both', 'plus']),
                 'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
                                                inclusive_start=False),
                 'unassignable_label': Str,
-                'num_threads': Int},
+                'threads': Int},
     outputs=[('classification', FeatureData[Taxonomy])],
     input_descriptions={'query': 'Sequences to classify taxonomically.',
                         'reference_reads': 'reference sequences.',
@@ -54,8 +54,8 @@ plugin.methods.register_function(
                    'or both directions ("both").'),
         'maxaccepts': ('Maximum number of hits to keep for each query. Must '
                        'be in range [0, infinity].'),
-        'min_id': 'Reject match if percent identity to query is lower. Must '
-                  'be in range [0.0, 1.0].',
+        'id_': 'Reject match if percent identity to query is lower. Must '
+               'be in range [0.0, 1.0].',
         'min_consensus': ('Minimum fraction of assignments must match top '
                           'hit to be accepted as consensus assignment. Must '
                           'be in range (0.5, 1.0].')

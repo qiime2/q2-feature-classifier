@@ -10,7 +10,7 @@ import tempfile
 import subprocess
 import pandas as pd
 from os.path import isfile
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 def _get_default_unassignable_label():
@@ -25,7 +25,7 @@ def _consensus_assignments(
     with tempfile.NamedTemporaryFile() as output:
         cmd = cmd + [output.name]
         _run_command(cmd)
-        obs_taxa = _import_blast_assignments(
+        obs_taxa = _import_blast_format_assignments(
             output.name, ref_taxa, unassignable_label=unassignable_label)
         consensus = _compute_consensus_annotations(
             obs_taxa, min_consensus=min_consensus,
@@ -73,10 +73,10 @@ def _run_command(cmd, verbose=True):
     subprocess.run(cmd, check=True)
 
 
-def _import_blast_assignments(
+def _import_blast_format_assignments(
         assignments, ref_taxa,
         unassignable_label=_get_default_unassignable_label()):
-    '''import observed assignments in blast6 format to dict of lists.
+    '''import observed assignments in blast6 or blast7 format to dict of lists.
 
     assignments: path or list
         Taxonomy observation map in blast format 6 or 7. Each line consists of
@@ -87,7 +87,7 @@ def _import_blast_assignments(
         Reference taxonomies in tab-delimited format:
             <accession ID>  kingdom;phylum;class;order;family;genus;species
     '''
-    obs_taxa = {}
+    obs_taxa = defaultdict(list)
     lines = _open_list_or_file(assignments)
 
     for line in lines:
@@ -121,10 +121,8 @@ def _import_blast_assignments(
                         'Reference taxonomy {0} (id: {1}) is incorrectly '
                         'formatted.').format(t, str(id_)))
 
-            if fields[0] in obs_taxa.keys():
-                obs_taxa[fields[0]].append(t)
-            else:
-                obs_taxa[fields[0]] = [t]
+            obs_taxa[fields[0]].append(t)
+
     return obs_taxa
 
 
