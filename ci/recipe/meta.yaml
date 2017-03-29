@@ -19,6 +19,8 @@ requirements:
     - biom-format >=2.1.5,<2.2.0
     - qiime2 2017.3.*
     - q2-types 2017.3.*
+    - blast 2.6.0
+    - vsearch 2.3.2
 
   run:
     - python 3.5*
@@ -28,6 +30,8 @@ requirements:
     - biom-format >=2.1.5,<2.2.0
     - qiime2 2017.3.*
     - q2-types 2017.3.*
+    - blast 2.6.0
+    - vsearch 2.3.2
 
 test:
   imports:
