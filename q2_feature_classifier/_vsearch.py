@@ -16,14 +16,15 @@ from ._consensus_assignment import (_consensus_assignments,
 
 
 def vsearch(query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
-            reference_taxonomy: pd.Series, maxaccepts: int=10, id_: int=0.8,
-            strand: str='both', min_consensus: float=0.51,
+            reference_taxonomy: pd.Series, maxaccepts: int=10,
+            perc_identity: int=0.8, strand: str='both',
+            min_consensus: float=0.51,
             unassignable_label: str=_get_default_unassignable_label(),
             threads: str=1) -> pd.DataFrame:
 
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
-    cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(id_),
+    cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(perc_identity),
            '--strand', strand, '--maxaccepts', str(maxaccepts),
            '--maxrejects', '0', '--output_no_hits', '--db', ref_fp,
            '--threads', str(threads), '--blast6out']
@@ -39,7 +40,7 @@ plugin.methods.register_function(
             'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': FeatureData[Taxonomy]},
     parameters={'maxaccepts': Int % Range(1, None),
-                'id_': Float % Range(0.0, 1.0, inclusive_end=True),
+                'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
                 'strand': Str % Choices(['both', 'plus']),
                 'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
                                                inclusive_start=False),
@@ -54,8 +55,8 @@ plugin.methods.register_function(
                    'or both directions ("both").'),
         'maxaccepts': ('Maximum number of hits to keep for each query. Must '
                        'be in range [0, infinity].'),
-        'id_': 'Reject match if percent identity to query is lower. Must '
-               'be in range [0.0, 1.0].',
+        'perc_identity': ('Reject match if percent identity to query is '
+                          'lower. Must be in range [0.0, 1.0].'),
         'min_consensus': ('Minimum fraction of assignments must match top '
                           'hit to be accepted as consensus assignment. Must '
                           'be in range (0.5, 1.0].')
