@@ -55,8 +55,8 @@ plugin.methods.register_function(
                    'or both directions ("both").'),
         'maxaccepts': ('Maximum number of hits to keep for each query. Must '
                        'be in range [0, infinity].'),
-        'perc_identity': 'Reject match if percent identity to query is lower. '
-               'Must be in range [0.0, 1.0].',
+        'perc_identity': ('Reject match if percent identity to query is '
+                          'lower. Must be in range [0.0, 1.0].'),
         'min_consensus': ('Minimum fraction of assignments must match top '
                           'hit to be accepted as consensus assignment. Must '
                           'be in range (0.5, 1.0].')
