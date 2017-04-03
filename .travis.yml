@@ -16,7 +16,7 @@ install:
   - conda create --yes -n test-env -c biocore python=$PYTHON_VERSION scikit-bio jupyter click pytest pytest-cov scikit-learn
   - source activate test-env
   - conda install --yes -c bioconda blast=2.6.0
-  - conda install --yes -c bioconda vsearch=2.3.2
+  - conda install --yes -c bioconda vsearch
   - pip install https://github.com/qiime2/qiime2/archive/master.zip
   - pip install https://github.com/qiime2/q2-types/archive/master.zip
   - pip install flake8 coveralls

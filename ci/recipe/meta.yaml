@@ -20,7 +20,7 @@ requirements:
     - qiime2 2017.3.*
     - q2-types 2017.3.*
     - blast 2.6.0
-    - vsearch 2.3.2
+    - vsearch
 
   run:
     - python 3.5*
@@ -31,7 +31,7 @@ requirements:
     - qiime2 2017.3.*
     - q2-types 2017.3.*
     - blast 2.6.0
-    - vsearch 2.3.2
+    - vsearch
 
 test:
   imports:
