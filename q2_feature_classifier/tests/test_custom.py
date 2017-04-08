@@ -1,0 +1,57 @@
+# ----------------------------------------------------------------------------
+# Copyright (c) 2016-2017, QIIME 2 development team.
+#
+# Distributed under the terms of the Modified BSD License.
+#
+# The full license is in the file LICENSE, distributed with this software.
+# ----------------------------------------------------------------------------
+
+import json
+
+from qiime2.sdk import Artifact
+from qiime2.plugins import feature_classifier
+import pandas as pd
+
+from . import FeatureClassifierTestPluginBase
+
+
+class CustomTests(FeatureClassifierTestPluginBase):
+    package = 'q2_feature_classifier.tests'
+
+    def setUp(self):
+        super().setUp()
+        self.taxonomy = Artifact.import_data(
+            'FeatureData[Taxonomy]', self.get_data_path('taxonomy.tsv'))
+
+    def test_low_memory_multinomial_nb(self):
+        # results should not depend on chunk size
+        fitter = feature_classifier.methods.fit_classifier_sklearn
+        classify = feature_classifier.methods.classify_sklearn
+        reads = Artifact.import_data(
+            'FeatureData[Sequence]',
+            self.get_data_path('se-dna-sequences.fasta'))
+
+        spec = [['feat_ext',
+                {'__type__': 'feature_extraction.text.HashingVectorizer',
+                 'analyzer': 'char_wb',
+                 'n_features': 8192,
+                 'ngram_range': [8, 8],
+                 'non_negative': True}],
+                ['classify',
+                 {'__type__': 'custom.LowMemoryMultinomialNB',
+                  'alpha': 0.01,
+                  'chunk_size': 20000}]]
+
+        classifier_spec = json.dumps(spec)
+        result = fitter(reads, self.taxonomy, classifier_spec)
+        result = classify(reads, result.classifier)
+        gc = result.classification.view(pd.Series).to_dict()
+
+        spec[1][1]['chunk_size'] = 20
+        classifier_spec = json.dumps(spec)
+        result = fitter(reads, self.taxonomy, classifier_spec)
+        result = classify(reads, result.classifier)
+        sc = result.classification.view(pd.Series).to_dict()
+
+        for taxon in gc:
+            self.assertEqual(gc[taxon], sc[taxon])

@@ -15,13 +15,14 @@ from ._consensus_assignment import (_consensus_assignments,
                                     _get_default_unassignable_label)
 
 
-def blast(query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
-          reference_taxonomy: pd.Series, maxaccepts: int=10,
-          perc_identity: float=0.8, strand: str='both', evalue: float=0.001,
-          min_consensus: float=0.51,
-          unassignable_label: str=_get_default_unassignable_label(),
-          num_threads: str=1) -> pd.DataFrame:
-
+def classify_consensus_blast(query: DNAFASTAFormat,
+                             reference_reads: DNAFASTAFormat,
+                             reference_taxonomy: pd.Series, maxaccepts: int=10,
+                             perc_identity: float=0.8, strand: str='both',
+                             evalue: float=0.001, min_consensus: float=0.51,
+                             unassignable_label: str=
+                             _get_default_unassignable_label(),
+                             num_threads: str=1) -> pd.DataFrame:
     perc_identity = perc_identity * 100
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
@@ -38,7 +39,7 @@ def blast(query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
 
 
 plugin.methods.register_function(
-    function=blast,
+    function=classify_consensus_blast,
     inputs={'query': FeatureData[Sequence],
             'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': FeatureData[Taxonomy]},

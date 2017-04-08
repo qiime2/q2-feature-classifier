@@ -25,13 +25,14 @@ class LowMemoryMultinomialNB(MultinomialNB):
             return super().fit(X, y, sample_weight=sample_weight)
 
         classes = numpy.unique(y)
-        for i in range(0, X.shape[1], self.chunk_size):
-            cX = X[i:i+self.chunk_size]
-            cy = y[i:i+self.chunk_size]
+        for i in range(0, X.shape[0], self.chunk_size):
+            upper = min(i+self.chunk_size, X.shape[0])
+            cX = X[i:upper]
+            cy = y[i:upper]
             if sample_weight is None:
                 csample_weight = None
             else:
-                csample_weight = sample_weight[i:i+self.chunk_size]
+                csample_weight = sample_weight[i:upper]
             self.partial_fit(cX, cy, sample_weight=csample_weight,
                              classes=classes)
 

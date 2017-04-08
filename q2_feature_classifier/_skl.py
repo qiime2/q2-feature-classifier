@@ -21,7 +21,8 @@ _specific_fitters = [
             'non_negative': True}],
           ['classify',
            {'__type__': 'custom.LowMemoryMultinomialNB',
-            'alpha': 0.01}]]]]
+            'alpha': 0.01,
+            'chunk_size': 20000}]]]]
 
 
 def fit_pipeline(reads, taxonomy, pipeline):
@@ -38,8 +39,6 @@ def _extract_reads(reads):
 
 def predict(reads, pipeline, separator=';', chunk_size=262144, n_jobs=1,
             pre_dispatch='2*n_jobs', confidence=-1.):
-    if confidence >= 0.:
-        chunk_size = chunk_size // 101 + 1
     return (m for c in Parallel(n_jobs=n_jobs, batch_size=1,
                                 pre_dispatch=pre_dispatch)
             (delayed(_predict_chunk)(pipeline, separator, confidence, chunk)
@@ -91,6 +90,7 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
 
 
 def _chunks(reads, chunk_size):
+    reads = iter(reads)
     while True:
         chunk = list(islice(reads, chunk_size))
         if len(chunk) == 0:
