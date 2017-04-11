@@ -15,7 +15,7 @@ from sklearn.preprocessing import LabelEncoder
 
 class LowMemoryMultinomialNB(MultinomialNB):
     def __init__(self, alpha=1.0, fit_prior=True, class_prior=None,
-                 chunk_size=-1):
+                 chunk_size=20000):
         self.chunk_size = chunk_size
         super().__init__(alpha=alpha, fit_prior=fit_prior,
                          class_prior=class_prior)
