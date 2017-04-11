@@ -10,12 +10,14 @@ import json
 import importlib
 import inspect
 import warnings
+from itertools import chain, islice
 
 import pandas as pd
-from qiime2.plugin import Int, Str, Float, Bool
+from qiime2.plugin import Int, Str, Float, Bool, Choices
 from q2_types.feature_data import FeatureData, Taxonomy, Sequence, DNAIterator
 from sklearn.pipeline import Pipeline
 import sklearn
+from numpy import median, array
 
 from ._skl import fit_pipeline, predict, _specific_fitters
 from ._taxonomic_classifier import TaxonomicClassifier
@@ -94,8 +96,9 @@ def warn_about_sklearn():
     warnings.warn(warning, UserWarning)
 
 
-def fit_classifier(reference_reads: DNAIterator, reference_taxonomy: pd.Series,
-                   classifier_specification: str) -> Pipeline:
+def fit_classifier_sklearn(reference_reads: DNAIterator,
+                           reference_taxonomy: pd.Series,
+                           classifier_specification: str) -> Pipeline:
     warn_about_sklearn()
     spec = json.loads(classifier_specification)
     pipeline = pipeline_from_spec(spec)
@@ -104,20 +107,41 @@ def fit_classifier(reference_reads: DNAIterator, reference_taxonomy: pd.Series,
 
 
 plugin.methods.register_function(
-    function=fit_classifier,
+    function=fit_classifier_sklearn,
     inputs={'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': FeatureData[Taxonomy]},
     parameters={'classifier_specification': Str},
     outputs=[('classifier', TaxonomicClassifier)],
-    name='Train a scikit-learn classifier.',
+    name='Train an almost arbitrary scikit-learn classifier',
     description='Train a scikit-learn classifier to classify reads.'
 )
 
 
-def classify(reads: DNAIterator, classifier: Pipeline,
-             chunk_size: int=262144, n_jobs: int=1,
-             pre_dispatch: str='2*n_jobs', confidence: float=-1.
-             ) -> pd.DataFrame:
+def _autodetect_orientation(reads, classifier, n=100,
+                            read_orientation=None):
+    if read_orientation == 'same':
+        return reads
+    if read_orientation == 'reverse-complement':
+        return (r.reverse_complement() for r in reads)
+    reads = iter(reads)
+    first_n_reads = list(islice(reads, n))
+    result = list(zip(*predict(first_n_reads, classifier, confidence=0.)))
+    _, _, same_confidence = result
+    reversed_n_reads = [r.reverse_complement() for r in first_n_reads]
+    result = list(zip(*predict(reversed_n_reads, classifier, confidence=0.)))
+    _, _, reverse_confidence = result
+    if median(array(same_confidence) - array(reverse_confidence)) > 0.:
+        return chain(first_n_reads, reads)
+    return chain(reversed_n_reads, (r.reverse_complement() for r in reads))
+
+
+def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
+                     chunk_size: int=262144, n_jobs: int=1,
+                     pre_dispatch: str='2*n_jobs', confidence: float=-1.,
+                     read_orientation: str=None
+                     ) -> pd.DataFrame:
+    reads = _autodetect_orientation(
+        reads, classifier, read_orientation=read_orientation)
     predictions = predict(reads, classifier, chunk_size=chunk_size,
                           n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                           confidence=confidence)
@@ -133,20 +157,29 @@ def classify(reads: DNAIterator, classifier: Pipeline,
 
 
 _classify_parameters = {'chunk_size': Int, 'n_jobs': Int, 'pre_dispatch': Str,
-                        'confidence': Float}
+                        'confidence': Float, 'read_orientation':
+                        Str % Choices(['same', 'reverse-complement'])}
 
 
 plugin.methods.register_function(
-    function=classify,
+    function=classify_sklearn,
     inputs={'reads': FeatureData[Sequence],
             'classifier': TaxonomicClassifier},
     parameters=_classify_parameters,
     outputs=[('classification', FeatureData[Taxonomy])],
-    name='Classify reads by taxon.',
+    name='Pre-fitted sklearn-based taxonomy classifier',
     description='Classify reads by taxon using a fitted classifier.',
     parameter_descriptions={'confidence': 'Confidence threshold for limiting '
-                            'taxonomic depth. Negative value disables. '
-                            'Currently experimental. USE WITH CAUTION.'}
+                            'taxonomic depth. Negative value disables '
+                            'Currently experimental. USE WITH CAUTION',
+                            'read_orientation': 'Direction of reads with '
+                            'respect to reference sequences. same will cause '
+                            'reads to be classified unchanged; '
+                            'reverse-complement will cause reads to be '
+                            'reversed and complemented prior to '
+                            'classification. Default is to autodetect based on'
+                            ' the confidence estimates for the first 100 reads'
+                            }
 )
 
 
@@ -205,8 +238,8 @@ def _register_fitter(name, spec):
                 'reference_taxonomy': FeatureData[Taxonomy]},
         parameters=parameters,
         outputs=[('classifier', TaxonomicClassifier)],
-        name='Train the ' + name + ' classifier.',
-        description='Create a ' + name + ' classifier for reads'
+        name='Train the ' + name + ' classifier',
+        description='Create a scikit-learn ' + name + ' classifier for reads'
     )
 
 

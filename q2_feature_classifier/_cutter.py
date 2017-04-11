@@ -115,8 +115,7 @@ def _gen_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
             continue
         if length > 0:
             amp = amp[:length]
-        if len(amp) > 0:
-            yield amp
+        yield amp
 
 
 def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
@@ -158,6 +157,6 @@ plugin.methods.register_function(
                 'r_primer': Str,
                 'identity': Float},
     outputs=[('reads', FeatureData[Sequence])],
-    name='Extract reads from reference.',
+    name='Extract reads from reference',
     description='Extract sequencing-like reads from a reference database.'
 )

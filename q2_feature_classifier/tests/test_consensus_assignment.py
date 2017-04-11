@@ -7,8 +7,8 @@
 # ----------------------------------------------------------------------------
 
 import pandas as pd
-from q2_feature_classifier._blast import blast
-from q2_feature_classifier._vsearch import vsearch
+from q2_feature_classifier._blast import classify_consensus_blast
+from q2_feature_classifier._vsearch import classify_consensus_vsearch
 from q2_feature_classifier._consensus_assignment import (
     _compute_consensus_annotation,
     _compute_consensus_annotations,
@@ -31,7 +31,8 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
     # Make sure blast and vsearch produce expected outputs
     # but there is no "right" taxonomy assignment.
     def test_blast(self):
-        result = blast(self.reads, self.reads, self.taxonomy)
+        result = classify_consensus_blast(self.reads, self.reads,
+                                          self.taxonomy)
         res = result.Taxon.to_dict()
         tax = self.taxonomy.to_dict()
         right = 0.
@@ -40,7 +41,8 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
         self.assertGreater(right/len(res), 0.5)
 
     def test_vsearch(self):
-        result = vsearch(self.reads, self.reads, self.taxonomy)
+        result = classify_consensus_vsearch(self.reads, self.reads,
+                                            self.taxonomy)
         res = result.Taxon.to_dict()
         tax = self.taxonomy.to_dict()
         right = 0.
