@@ -118,10 +118,10 @@ plugin.methods.register_function(
 
 
 def _autodetect_orientation(reads, classifier, n=100,
-                            force_orientation=None):
-    if force_orientation == 'same':
+                            read_orientation=None):
+    if read_orientation == 'same':
         return reads
-    if force_orientation == 'reverse-complement':
+    if read_orientation == 'reverse-complement':
         return (r.reverse_complement() for r in reads)
     reads = iter(reads)
     first_n_reads = list(islice(reads, n))
@@ -138,10 +138,10 @@ def _autodetect_orientation(reads, classifier, n=100,
 def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
                      chunk_size: int=262144, n_jobs: int=1,
                      pre_dispatch: str='2*n_jobs', confidence: float=-1.,
-                     force_orientation: str=None
+                     read_orientation: str=None
                      ) -> pd.DataFrame:
     reads = _autodetect_orientation(
-        reads, classifier, force_orientation=force_orientation)
+        reads, classifier, read_orientation=read_orientation)
     predictions = predict(reads, classifier, chunk_size=chunk_size,
                           n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                           confidence=confidence)
@@ -157,7 +157,7 @@ def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
 
 
 _classify_parameters = {'chunk_size': Int, 'n_jobs': Int, 'pre_dispatch': Str,
-                        'confidence': Float, 'force_orientation':
+                        'confidence': Float, 'read_orientation':
                         Str % Choices(['same', 'reverse-complement'])}
 
 
@@ -172,12 +172,14 @@ plugin.methods.register_function(
     parameter_descriptions={'confidence': 'Confidence threshold for limiting '
                             'taxonomic depth. Negative value disables '
                             'Currently experimental. USE WITH CAUTION',
-                            'force_orientation': 'Force assumption that reads '
-                            'have the same orientation as the reference '
-                            'sequences or that reads must be reversed and '
-                            'complemented to match the references. '
-                            'Default is to autodetect based on the confidence '
-                            'estimates for the first 100 reads'}
+                            'read_orientation': 'Direction of reads with '
+                            'respect to reference sequences. same will cause '
+                            'reads to be classified unchanged; '
+                            'reverse-complement will cause reads to be '
+                            'reversed and complemented prior to '
+                            'classification. Default is to autodetect based on'
+                            ' the confidence estimates for the first 100 reads'
+                            }
 )
 
 

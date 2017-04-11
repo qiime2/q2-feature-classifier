@@ -116,10 +116,10 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             self.assertEqual(fc[taxon], rc[taxon])
 
         result = classify(reads, classifier,
-                          force_orientation='same')
+                          read_orientation='same')
         fc = result.classification.view(pd.Series).to_dict()
         result = classify(rev_reads, classifier,
-                          force_orientation='reverse-complement')
+                          read_orientation='reverse-complement')
         rc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
