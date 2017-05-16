@@ -7,9 +7,10 @@
 # ----------------------------------------------------------------------------
 
 import importlib
-import pkg_resources
+from ._version import get_versions
 
-__version__ = pkg_resources.get_distribution('q2-feature-classifier').version
+__version__ = get_versions()['version']
+del get_versions
 
 importlib.import_module('q2_feature_classifier.classifier')
 importlib.import_module('q2_feature_classifier._cutter')
