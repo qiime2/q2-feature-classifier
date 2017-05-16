@@ -137,7 +137,7 @@ def _autodetect_orientation(reads, classifier, n=100,
 
 def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
                      chunk_size: int=262144, n_jobs: int=1,
-                     pre_dispatch: str='2*n_jobs', confidence: float=-1.,
+                     pre_dispatch: str='2*n_jobs', confidence: float=0.7,
                      read_orientation: str=None
                      ) -> pd.DataFrame:
     reads = _autodetect_orientation(
@@ -170,8 +170,7 @@ plugin.methods.register_function(
     name='Pre-fitted sklearn-based taxonomy classifier',
     description='Classify reads by taxon using a fitted classifier.',
     parameter_descriptions={'confidence': 'Confidence threshold for limiting '
-                            'taxonomic depth. Negative value disables '
-                            'Currently experimental. USE WITH CAUTION',
+                            'taxonomic depth. Negative value disables.',
                             'read_orientation': 'Direction of reads with '
                             'respect to reference sequences. same will cause '
                             'reads to be classified unchanged; '
