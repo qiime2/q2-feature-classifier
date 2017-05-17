@@ -10,6 +10,7 @@ import json
 import os
 
 from qiime2.sdk import Artifact
+from q2_types.feature_data import DNAIterator
 from qiime2.plugins import feature_classifier
 import pandas as pd
 import skbio
@@ -29,28 +30,21 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         self.taxonomy = Artifact.import_data(
             'FeatureData[Taxonomy]', self.get_data_path('taxonomy.tsv'))
 
+        seq_path = self.get_data_path('se-dna-sequences.fasta')
+        reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
+        fitter_name = _specific_fitters[0][0]
+        fitter = getattr(feature_classifier.methods,
+                         'fit_classifier_' + fitter_name)
+        self.classifier = fitter(reads, self.taxonomy).classifier
+
     def test_fit_classifier(self):
         # fit_classifier should generate a working taxonomic_classifier
         reads = Artifact.import_data(
             'FeatureData[Sequence]',
             self.get_data_path('se-dna-sequences.fasta'))
 
-        classifier_specification = \
-            [['feat_ext',
-              {'__type__': 'feature_extraction.text.HashingVectorizer',
-               'analyzer': 'char_wb',
-               'n_features': 8192,
-               'ngram_range': [8, 8],
-               'non_negative': True}],
-             ['classify',
-              {'__type__': 'naive_bayes.MultinomialNB',
-               'alpha': 0.01}]]
-        classifier_specification = json.dumps(classifier_specification)
-        fit_classifier = feature_classifier.methods.fit_classifier_sklearn
-        result = fit_classifier(reads, self.taxonomy, classifier_specification)
-
         classify = feature_classifier.methods.classify_sklearn
-        result = classify(reads, result.classifier)
+        result = classify(reads, self.classifier)
 
         ref = self.taxonomy.view(pd.Series).to_dict()
         cls = result.classification.view(pd.Series).to_dict()
@@ -58,7 +52,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         right = 0.
         for taxon in cls:
             right += ref[taxon].startswith(cls[taxon])
-        self.assertGreater(right/len(cls), 0.5)
+        self.assertGreater(right/len(cls), 0.95)
 
     def test_fit_specific_classifiers(self):
         # specific and general classifiers should produce the same results
@@ -102,31 +96,41 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
                        'fasta', rev_path)
         rev_reads = Artifact.import_data('FeatureData[Sequence]', rev_path)
 
-        fitter_name = _specific_fitters[0][0]
-        fitter = getattr(feature_classifier.methods,
-                         'fit_classifier_' + fitter_name)
-        classifier = fitter(reads, self.taxonomy).classifier
-
-        result = classify(reads, classifier)
+        result = classify(reads, self.classifier)
         fc = result.classification.view(pd.Series).to_dict()
-        result = classify(rev_reads, classifier)
+        result = classify(rev_reads, self.classifier)
         rc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
             self.assertEqual(fc[taxon], rc[taxon])
 
-        result = classify(reads, classifier,
-                          read_orientation='same')
+        result = classify(reads, self.classifier, read_orientation='same')
         fc = result.classification.view(pd.Series).to_dict()
-        result = classify(rev_reads, classifier,
+        result = classify(rev_reads, self.classifier,
                           read_orientation='reverse-complement')
         rc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
             self.assertEqual(fc[taxon], rc[taxon])
 
-        result = classify(reads, classifier, chunk_size=100, n_jobs=2)
+        result = classify(reads, self.classifier, chunk_size=100, n_jobs=2)
         cc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
             self.assertEqual(fc[taxon], cc[taxon])
+
+    def test_unassigned_taxa(self):
+        # classifications that don't meet the threshold should be "Unassigned"
+        classify = feature_classifier.methods.classify_sklearn
+        seq_path = self.get_data_path('se-dna-sequences.fasta')
+        reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
+        result = classify(reads, self.classifier, confidence=1.)
+
+        ref = self.taxonomy.view(pd.Series).to_dict()
+        cls = result.classification.view(pd.Series).to_dict()
+
+        assert 'Unassigned' in cls.values()
+        for seq in reads.view(DNAIterator):
+            _id = seq.metadata['id']
+            assert ref[_id].startswith(cls[_id]) or \
+                cls[_id] == 'Unassigned'
