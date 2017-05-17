@@ -98,8 +98,7 @@ def _approx_match(seq, f_primer, r_primer, identity):
     return None
 
 
-def _gen_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
-               length: int=-1, identity: float=0.8) -> DNAIterator:
+def _gen_reads(sequences,  f_primer, r_primer, trunc_len, trim_left, identity):
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
     for seq in sequences:
@@ -109,17 +108,22 @@ def _gen_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
         if not amp:
             amp = _approx_match(seq, f_primer, r_primer, identity)
         if not amp:
-            amp = _approx_match(seq.reverse_complement(), f_primer, r_primer,
-                                identity)
+            amp = _approx_match(
+                seq.reverse_complement(), f_primer, r_primer, identity)
         if not amp:
             continue
-        if length > 0:
-            amp = amp[:length]
+        if trunc_len > 0:
+            amp = amp[:trunc_len]
+        if trim_left > 0:
+            amp = amp[trim_left:]
+        if not amp:
+            continue
         yield amp
 
 
 def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
-                  length: int=-1, identity: float=0.8) -> DNAIterator:
+                  trunc_len: int=-1, trim_left: int=-1,
+                  identity: float=0.8) -> DNAIterator:
     """Extract the read selected by a primer or primer pair. Only sequences
     which match the primers at greater than the specified identity are returned
 
@@ -131,8 +135,12 @@ def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
         forward primer sequence
     r_primer : skbio.sequence.DNA
         reverse primer sequence
-    length : int, optional
-        length of each read. Full amplicon is returned if length is negative
+    trunc_len : int, optional
+        read is cut to trunc_len if trunc_len is positive. Applied before
+        trim_left.
+    trim_left : int, optional
+        trim_left nucleotides are removed from the 5' end if trim_left is
+        positive. Applied after trunc_len.
     identity : float, optional
         minimum combined primer match identity threshold. Default: 0.8
 
@@ -141,7 +149,8 @@ def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
     q2_types.DNAIterator
         containing the reads
     """
-    reads = _gen_reads(sequences, f_primer, r_primer, length, identity)
+    reads = _gen_reads(
+        sequences, f_primer, r_primer, trunc_len, trim_left, identity)
     try:
         first_read = next(reads)
     except StopIteration:
@@ -152,11 +161,21 @@ def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
 plugin.methods.register_function(
     function=extract_reads,
     inputs={'sequences': FeatureData[Sequence]},
-    parameters={'length': Int,
+    parameters={'trunc_len': Int,
+                'trim_left': Int,
                 'f_primer': Str,
                 'r_primer': Str,
                 'identity': Float},
     outputs=[('reads', FeatureData[Sequence])],
     name='Extract reads from reference',
-    description='Extract sequencing-like reads from a reference database.'
+    description='Extract sequencing-like reads from a reference database.',
+    parameter_descriptions={'f_primer': 'forward primer sequence',
+                            'r_primer': 'reverse primer sequence',
+                            'trunc_len': 'read is cut to trunc_len if '
+                            'trunc_len is positive. Applied before trim_left.',
+                            'trim_left': "trim_left nucleotides are removed "
+                            "from the 5' end if trim_left is positive. "
+                            "Applied after trunc_len.",
+                            'identity': 'minimum combined primer match '
+                            'identity threshold.'}
 )

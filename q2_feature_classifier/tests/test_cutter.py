@@ -23,16 +23,18 @@ class CutterTests(FeatureClassifierTestPluginBase):
 
     def test_extract_reads(self):
         # extract_reads should generate a FeatureData(Sequence) full of reads
-        length = 75
+        trunc_len = 75
+        trim_left = 5
         f_primer = 'AGAGTTTGATCMTGGCTCAG'
         r_primer = 'GCTGCCTCCCGTAGGAGT'
         extract_reads = feature_classifier.methods.extract_reads
         result = extract_reads(self.sequences, f_primer=f_primer,
-                               r_primer=r_primer, length=length, identity=0.9)
+                               r_primer=r_primer, trunc_len=trunc_len,
+                               trim_left=trim_left, identity=0.9)
         self.assertEqual(result.reads.type, FeatureData[Sequence])
         inseqs = list(self.sequences.view(DNAIterator))
         outseqs = list(result.reads.view(DNAIterator))
         self.assertLessEqual(len(outseqs), len(inseqs))
         self.assertTrue(bool(outseqs))
         for seq in outseqs:
-            self.assertEqual(len(seq), length)
+            self.assertEqual(len(seq), trunc_len - trim_left)
