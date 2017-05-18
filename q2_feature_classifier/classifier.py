@@ -169,16 +169,20 @@ plugin.methods.register_function(
     outputs=[('classification', FeatureData[Taxonomy])],
     name='Pre-fitted sklearn-based taxonomy classifier',
     description='Classify reads by taxon using a fitted classifier.',
-    parameter_descriptions={'confidence': 'Confidence threshold for limiting '
-                            'taxonomic depth. Negative value disables.',
-                            'read_orientation': 'Direction of reads with '
+    parameter_descriptions={
+        'confidence': 'Confidence threshold for limiting '
+                      'taxonomic depth. Provide -1 to disable '
+                      'confidence calculation, or 0 to calculate '
+                      'confidence but not apply it to limit the '
+                      'taxonomic depth of the assignments.',
+        'read_orientation': 'Direction of reads with '
                             'respect to reference sequences. same will cause '
-                            'reads to be classified unchanged; '
-                            'reverse-complement will cause reads to be '
-                            'reversed and complemented prior to '
-                            'classification. Default is to autodetect based on'
-                            ' the confidence estimates for the first 100 reads'
-                            }
+                            'reads to be classified unchanged; reverse-'
+                            'complement will cause reads to be reversed '
+                            'and complemented prior to classification. '
+                            'Default is to autodetect based on the '
+                            'confidence estimates for the first 100 reads.'
+    }
 )
 
 
