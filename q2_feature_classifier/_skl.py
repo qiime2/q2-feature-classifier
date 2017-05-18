@@ -84,6 +84,8 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
         if result:
             result = separator.join(result)
             results.append((seq_id, result, result_confidence))
+        else:
+            results.append((seq_id, 'Unassigned', 1. - cum_prob))
 
     return results
 

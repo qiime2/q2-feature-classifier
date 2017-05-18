@@ -119,11 +119,16 @@ plugin.methods.register_function(
 
 def _autodetect_orientation(reads, classifier, n=100,
                             read_orientation=None):
+    reads = iter(reads)
+    try:
+        read = next(reads)
+    except StopIteration:
+        raise ValueError('empty reads input')
+    reads = chain([read], reads)
     if read_orientation == 'same':
         return reads
     if read_orientation == 'reverse-complement':
         return (r.reverse_complement() for r in reads)
-    reads = iter(reads)
     first_n_reads = list(islice(reads, n))
     result = list(zip(*predict(first_n_reads, classifier, confidence=0.)))
     _, _, same_confidence = result
@@ -145,11 +150,7 @@ def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
     predictions = predict(reads, classifier, chunk_size=chunk_size,
                           n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                           confidence=confidence)
-    result = list(zip(*predictions))
-    if len(result) == 0:
-        seq_ids, taxonomy, confidence = [], [], []
-    else:
-        seq_ids, taxonomy, confidence = result
+    seq_ids, taxonomy, confidence = list(zip(*predictions))
     result = pd.DataFrame({'Taxon': taxonomy, 'Confidence': confidence},
                           index=seq_ids, columns=['Taxon', 'Confidence'])
     result.index.name = 'Feature ID'
