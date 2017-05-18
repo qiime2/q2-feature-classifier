@@ -21,7 +21,8 @@ _specific_fitters = [
             'non_negative': True}],
           ['classify',
            {'__type__': 'custom.LowMemoryMultinomialNB',
-            'alpha': 0.01}]]]]
+            'alpha': 0.01,
+            'fit_prior': False}]]]]
 
 
 def fit_pipeline(reads, taxonomy, pipeline):
