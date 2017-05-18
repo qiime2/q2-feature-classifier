@@ -40,7 +40,7 @@ class CutterTests(FeatureClassifierTestPluginBase):
         raw_lens = []
         for trunc_len, trim_left in product(trunc_lens, trim_lefts):
             if trunc_len == trim_left and trunc_len > 0:
-                with self.assertRaises(RuntimeError):
+                with self.assertRaisesRegex(RuntimeError, "No matches found"):
                     result = extract_reads(
                         self.sequences, f_primer=f_primer, r_primer=r_primer,
                         trunc_len=trunc_len, trim_left=trim_left, identity=0.9)
