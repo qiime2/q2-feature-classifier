@@ -47,12 +47,12 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         result = classify(reads, self.classifier)
 
         ref = self.taxonomy.view(pd.Series).to_dict()
-        cls = result.classification.view(pd.Series).to_dict()
+        classified = result.classification.view(pd.Series).to_dict()
 
         right = 0.
-        for taxon in cls:
-            right += ref[taxon].startswith(cls[taxon])
-        self.assertGreater(right/len(cls), 0.95)
+        for taxon in classified:
+            right += ref[taxon].startswith(classified[taxon])
+        self.assertGreater(right/len(classified), 0.95)
 
     def test_fit_specific_classifiers(self):
         # specific and general classifiers should produce the same results
@@ -127,10 +127,10 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         result = classify(reads, self.classifier, confidence=1.)
 
         ref = self.taxonomy.view(pd.Series).to_dict()
-        cls = result.classification.view(pd.Series).to_dict()
+        classified = result.classification.view(pd.Series).to_dict()
 
-        assert 'Unassigned' in cls.values()
+        assert 'Unassigned' in classified.values()
         for seq in reads.view(DNAIterator):
-            _id = seq.metadata['id']
-            assert ref[_id].startswith(cls[_id]) or \
-                cls[_id] == 'Unassigned'
+            id_ = seq.metadata['id']
+            assert ref[id_].startswith(classified[id_]) or \
+                classified[id_] == 'Unassigned'
