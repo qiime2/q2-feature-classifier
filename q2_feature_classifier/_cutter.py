@@ -122,7 +122,7 @@ def _gen_reads(sequences,  f_primer, r_primer, trunc_len, trim_left, identity):
 
 
 def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
-                  trunc_len: int=-1, trim_left: int=-1,
+                  trunc_len: int=0, trim_left: int=0,
                   identity: float=0.8) -> DNAIterator:
     """Extract the read selected by a primer or primer pair. Only sequences
     which match the primers at greater than the specified identity are returned
