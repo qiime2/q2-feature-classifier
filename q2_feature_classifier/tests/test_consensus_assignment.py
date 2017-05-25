@@ -7,6 +7,8 @@
 # ----------------------------------------------------------------------------
 
 import pandas as pd
+
+from qiime2.sdk import Artifact
 from q2_feature_classifier._blast import classify_consensus_blast
 from q2_feature_classifier._vsearch import classify_consensus_vsearch
 from q2_feature_classifier._consensus_assignment import (
@@ -23,8 +25,11 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
 
     def setUp(self):
         super().setUp()
-        self.taxonomy_fp = self.get_data_path('taxonomy.tsv')
-        self.taxonomy = pd.Series.from_csv(self.taxonomy_fp, sep='\t')
+        taxonomy = Artifact.import_data(
+            'FeatureData[Taxonomy]', self.get_data_path('taxonomy.tsv'))
+        self.taxonomy = taxonomy.view(pd.Series)
+        # TODO: use `Artifact.import_data` here once we have a transformer
+        # for DNASequencesDirectoryFormat -> DNAFASTAFormat
         self.reads_fp = self.get_data_path('se-dna-sequences.fasta')
         self.reads = DNAFASTAFormat(self.reads_fp, mode='r')
 
@@ -37,7 +42,7 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
         tax = self.taxonomy.to_dict()
         right = 0.
         for taxon in res:
-            right += tax[int(taxon)].startswith(res[taxon])
+            right += tax[taxon].startswith(res[taxon])
         self.assertGreater(right/len(res), 0.5)
 
     def test_vsearch(self):
@@ -47,7 +52,7 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
         tax = self.taxonomy.to_dict()
         right = 0.
         for taxon in res:
-            right += tax[int(taxon)].startswith(res[taxon])
+            right += tax[taxon].startswith(res[taxon])
         self.assertGreater(right/len(res), 0.5)
 
 
