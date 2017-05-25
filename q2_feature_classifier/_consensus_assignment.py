@@ -98,13 +98,7 @@ def _import_blast_format_assignments(
             if fields[1] == '*':
                 t = [unassignable_label]
             else:
-                # ref taxonomy IDs get imported as a str when using CLI
-                # but imported as int in python interpreter (e.g., for tests)
-                # the following allows dict lookup as str or int.
-                if ref_taxa.index.dtype == int:
-                    id_ = int(fields[1])
-                else:
-                    id_ = fields[1]
+                id_ = fields[1]
 
                 try:
                     t = ref_taxa[id_]
