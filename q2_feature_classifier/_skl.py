@@ -21,7 +21,8 @@ _specific_fitters = [
             'non_negative': True}],
           ['classify',
            {'__type__': 'custom.LowMemoryMultinomialNB',
-            'alpha': 0.01}]]]]
+            'alpha': 0.01,
+            'fit_prior': False}]]]]
 
 
 def fit_pipeline(reads, taxonomy, pipeline):
@@ -84,6 +85,8 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
         if result:
             result = separator.join(result)
             results.append((seq_id, result, result_confidence))
+        else:
+            results.append((seq_id, 'Unassigned', 1. - cum_prob))
 
     return results
 

@@ -15,5 +15,10 @@ plugin = Plugin(
     name='feature-classifier',
     version=q2_feature_classifier.__version__,
     website='https://github.com/qiime2/q2-feature-classifier',
-    package='q2_feature_classifier'
+    package='q2_feature_classifier',
+    description=('This QIIME 2 plugin supports taxonomic '
+                 'classification of features using a variety '
+                 'of methods, including Naive Bayes, vsearch, '
+                 'and BLAST+.'),
+    short_description='Plugin for taxonomic classification.'
 )
