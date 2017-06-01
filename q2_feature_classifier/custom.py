@@ -6,11 +6,15 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+from itertools import islice
+
 import numpy
+from scipy.sparse import vstack
 from sklearn.base import BaseEstimator, ClassifierMixin, clone  # noqa
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted  # noqa
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import HashingVectorizer
 
 
 class LowMemoryMultinomialNB(MultinomialNB):
@@ -37,6 +41,46 @@ class LowMemoryMultinomialNB(MultinomialNB):
                              classes=classes)
 
         return self
+
+
+class ChunkedHashingVectorizer(HashingVectorizer):
+    # This class is a kludge to get around
+    # https://github.com/scikit-learn/scikit-learn/issues/8941
+    def __init__(self, input='content', encoding='utf-8',
+                 decode_error='strict', strip_accents=None,
+                 lowercase=True, preprocessor=None, tokenizer=None,
+                 stop_words=None, token_pattern=r"(?u)\b\w\w+\b",
+                 ngram_range=(1, 1), analyzer='word', n_features=(2 ** 20),
+                 binary=False, norm='l2', non_negative=False,
+                 dtype=numpy.float64, chunk_size=20000):
+        self.chunk_size = chunk_size
+        super().__init__(
+            input=input, encoding=encoding, decode_error=decode_error,
+            strip_accents=strip_accents, lowercase=lowercase,
+            preprocessor=preprocessor, tokenizer=tokenizer,
+            stop_words=stop_words, token_pattern=token_pattern,
+            ngram_range=ngram_range, analyzer=analyzer, n_features=n_features,
+            binary=binary, norm=norm, non_negative=non_negative, dtype=dtype)
+
+    def transform(self, X, y=None):
+        if self.chunk_size <= 0:
+            return super().transform(X, y)
+
+        returnX = None
+        X = iter(X)
+        while True:
+            cX = list(islice(X, self.chunk_size))
+            if len(cX) == 0:
+                break
+            cX = super().transform(cX)
+            if returnX is None:
+                returnX = cX
+            else:
+                returnX = vstack([returnX, cX])
+
+        return returnX
+
+    fit_transform = transform
 
 
 # Experimental feature. USE WITH CAUTION
