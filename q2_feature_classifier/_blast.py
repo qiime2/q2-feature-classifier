@@ -22,14 +22,13 @@ def classify_consensus_blast(query: DNAFASTAFormat,
                              evalue: float=0.001, min_consensus: float=0.51,
                              unassignable_label: str=
                              _get_default_unassignable_label(),
-                             num_threads: str=1) -> pd.DataFrame:
+                             ) -> pd.DataFrame:
     perc_identity = perc_identity * 100
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
     cmd = ['blastn', '-query', seqs_fp, '-evalue', str(evalue), '-strand',
            strand, '-outfmt', '7', '-subject', ref_fp, '-perc_identity',
-           str(perc_identity), '-max_target_seqs', str(maxaccepts),
-           '-num_threads', str(num_threads), '-out']
+           str(perc_identity), '-max_target_seqs', str(maxaccepts), '-out']
     consensus = _consensus_assignments(
         cmd, reference_taxonomy, unassignable_label=unassignable_label,
         min_consensus=min_consensus, output_no_hits=True,
@@ -49,8 +48,7 @@ plugin.methods.register_function(
                 'strand': Str % Choices(['both', 'plus', 'minus']),
                 'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
                                                inclusive_start=False),
-                'unassignable_label': Str,
-                'num_threads': Int},
+                'unassignable_label': Str},
     outputs=[('classification', FeatureData[Taxonomy])],
     input_descriptions={'query': 'Sequences to classify taxonomically.',
                         'reference_reads': 'reference sequences.',
