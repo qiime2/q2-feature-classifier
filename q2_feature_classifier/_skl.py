@@ -18,7 +18,7 @@ _specific_fitters = [
             'analyzer': 'char_wb',
             'n_features': 8192,
             'ngram_range': [8, 8],
-            'non_negative': True}],
+            'alternate_sign': False}],
           ['classify',
            {'__type__': 'custom.LowMemoryMultinomialNB',
             'alpha': 0.01,
