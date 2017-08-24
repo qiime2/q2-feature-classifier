@@ -51,7 +51,7 @@ class ChunkedHashingVectorizer(HashingVectorizer):
                  lowercase=True, preprocessor=None, tokenizer=None,
                  stop_words=None, token_pattern=r"(?u)\b\w\w+\b",
                  ngram_range=(1, 1), analyzer='word', n_features=(2 ** 20),
-                 binary=False, norm='l2', non_negative=False,
+                 binary=False, norm='l2', alternate_sign=True,
                  dtype=numpy.float64, chunk_size=20000):
         self.chunk_size = chunk_size
         super().__init__(
@@ -60,11 +60,12 @@ class ChunkedHashingVectorizer(HashingVectorizer):
             preprocessor=preprocessor, tokenizer=tokenizer,
             stop_words=stop_words, token_pattern=token_pattern,
             ngram_range=ngram_range, analyzer=analyzer, n_features=n_features,
-            binary=binary, norm=norm, non_negative=non_negative, dtype=dtype)
+            binary=binary, norm=norm, alternate_sign=alternate_sign,
+            dtype=dtype)
 
-    def transform(self, X, y=None):
+    def transform(self, X):
         if self.chunk_size <= 0:
-            return super().transform(X, y)
+            return super().transform(X)
 
         returnX = None
         X = iter(X)
