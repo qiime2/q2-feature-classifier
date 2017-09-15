@@ -15,9 +15,11 @@ from itertools import chain, islice
 import pandas as pd
 from qiime2.plugin import Int, Str, Float, Bool, Choices
 from q2_types.feature_data import FeatureData, Taxonomy, Sequence, DNAIterator
+from q2_types.feature_table import FeatureTable, RelativeFrequency
 from sklearn.pipeline import Pipeline
 import sklearn
 from numpy import median, array
+import biom
 
 from ._skl import fit_pipeline, predict, _specific_fitters
 from ._taxonomic_classifier import TaxonomicClassifier
@@ -96,12 +98,36 @@ def warn_about_sklearn():
     warnings.warn(warning, UserWarning)
 
 
+def populate_class_weight(pipeline, class_weight):
+    classes = class_weight.ids('observation')
+    class_weights = []
+    for weights in class_weight.iter_data():
+        class_weights.append(zip(classes, weights))
+    step, classifier = pipeline.steps[-1]
+    for param in classifier.get_params():
+        if param == 'class_weight':
+            class_weights = list(map(dict, class_weights))
+            if len(class_weights) == 1:
+                class_weights = class_weights[0]
+            pipeline.set_params(**{'__'.join([step, param]): class_weights})
+        elif param in ('priors', 'class_prior'):
+            if len(class_weights) != 1:
+                raise ValueError('naive_bayes classifiers do not support '
+                                 'multilabel classification')
+            priors = list(zip(*sorted(class_weights[0])))[1]
+            pipeline.set_params(**{'__'.join([step, param]): priors})
+    return pipeline
+
+
 def fit_classifier_sklearn(reference_reads: DNAIterator,
                            reference_taxonomy: pd.Series,
-                           classifier_specification: str) -> Pipeline:
+                           classifier_specification: str,
+                           class_weight: biom.Table=None) -> Pipeline:
     warn_about_sklearn()
     spec = json.loads(classifier_specification)
     pipeline = pipeline_from_spec(spec)
+    if class_weight is not None:
+        pipeline = populate_class_weight(pipeline, class_weight)
     pipeline = fit_pipeline(reference_reads, reference_taxonomy, pipeline)
     return pipeline
 
@@ -109,7 +135,8 @@ def fit_classifier_sklearn(reference_reads: DNAIterator,
 plugin.methods.register_function(
     function=fit_classifier_sklearn,
     inputs={'reference_reads': FeatureData[Sequence],
-            'reference_taxonomy': FeatureData[Taxonomy]},
+            'reference_taxonomy': FeatureData[Taxonomy],
+            'class_weight': FeatureTable[RelativeFrequency]},
     parameters={'classifier_specification': Str},
     outputs=[('classifier', TaxonomicClassifier)],
     name='Train an almost arbitrary scikit-learn classifier',
@@ -124,6 +151,11 @@ def _autodetect_orientation(reads, classifier, n=100,
         read = next(reads)
     except StopIteration:
         raise ValueError('empty reads input')
+    if not hasattr(classifier, "predict_proba"):
+        warnings.warn("this classifier does not support confidence values, "
+                      "so read orientation autodetection is disabled",
+                      UserWarning)
+        return reads
     reads = chain([read], reads)
     if read_orientation == 'same':
         return reads
@@ -215,7 +247,8 @@ def _register_fitter(name, spec):
     parameters, signature_params = _pipeline_signature(spec)
 
     def generic_fitter(reference_reads: DNAIterator,
-                       reference_taxonomy: pd.Series, **kwargs) -> Pipeline:
+                       reference_taxonomy: pd.Series,
+                       class_weight: biom.Table=None, **kwargs) -> Pipeline:
         warn_about_sklearn()
         for param in kwargs:
             try:
@@ -224,6 +257,8 @@ def _register_fitter(name, spec):
                 pass
         pipeline = pipeline_from_spec(spec)
         pipeline.set_params(**kwargs)
+        if class_weight is not None:
+            pipeline = populate_class_weight(pipeline, class_weight)
         pipeline = fit_pipeline(reference_reads, reference_taxonomy,
                                 pipeline)
         return pipeline
@@ -239,7 +274,8 @@ def _register_fitter(name, spec):
     plugin.methods.register_function(
         function=generic_fitter,
         inputs={'reference_reads': FeatureData[Sequence],
-                'reference_taxonomy': FeatureData[Taxonomy]},
+                'reference_taxonomy': FeatureData[Taxonomy],
+                'class_weight': FeatureTable[RelativeFrequency]},
         parameters=parameters,
         outputs=[('classifier', TaxonomicClassifier)],
         name='Train the ' + name + ' classifier',
