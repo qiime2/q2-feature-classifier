@@ -99,8 +99,6 @@ def warn_about_sklearn():
 
 
 def populate_class_weight(pipeline, class_weight):
-    if class_weight is None:
-        return
     classes = class_weight.ids('observation')
     class_weights = []
     for weights in class_weight.iter_data():
@@ -118,6 +116,7 @@ def populate_class_weight(pipeline, class_weight):
                                  'multilabel classification')
             priors = list(zip(*sorted(class_weights[0])))[1]
             pipeline.set_params(**{'__'.join([step, param]): priors})
+    return pipeline
 
 
 def fit_classifier_sklearn(reference_reads: DNAIterator,
@@ -127,7 +126,8 @@ def fit_classifier_sklearn(reference_reads: DNAIterator,
     warn_about_sklearn()
     spec = json.loads(classifier_specification)
     pipeline = pipeline_from_spec(spec)
-    populate_class_weight(pipeline, class_weight)
+    if class_weight is not None:
+        pipeline = populate_class_weight(pipeline, class_weight)
     pipeline = fit_pipeline(reference_reads, reference_taxonomy, pipeline)
     return pipeline
 
@@ -153,7 +153,7 @@ def _autodetect_orientation(reads, classifier, n=100,
         raise ValueError('empty reads input')
     if not hasattr(classifier, "predict_proba"):
         warnings.warn("this classifier does not support confidence values, "
-                      "so read orientation autodection is disabled",
+                      "so read orientation autodetection is disabled",
                       UserWarning)
         return reads
     reads = chain([read], reads)
@@ -257,7 +257,8 @@ def _register_fitter(name, spec):
                 pass
         pipeline = pipeline_from_spec(spec)
         pipeline.set_params(**kwargs)
-        populate_class_weight(pipeline, class_weight)
+        if class_weight is not None:
+            pipeline = populate_class_weight(pipeline, class_weight)
         pipeline = fit_pipeline(reference_reads, reference_taxonomy,
                                 pipeline)
         return pipeline
