@@ -170,6 +170,10 @@ plugin.methods.register_function(
     outputs=[('classification', FeatureData[Taxonomy])],
     name='Pre-fitted sklearn-based taxonomy classifier',
     description='Classify reads by taxon using a fitted classifier.',
+    input_descriptions={
+        'reads': 'The feature data to be classified.',
+        'classifier': 'The taxonomic classifier for classifying the reads.'
+    },
     parameter_descriptions={
         'confidence': 'Confidence threshold for limiting '
                       'taxonomic depth. Provide -1 to disable '
@@ -182,7 +186,15 @@ plugin.methods.register_function(
                             'complement will cause reads to be reversed '
                             'and complemented prior to classification. '
                             'Default is to autodetect based on the '
-                            'confidence estimates for the first 100 reads.'
+                            'confidence estimates for the first 100 reads.',
+        'chunk_size': 'Number of reads to process in each batch.',
+        'n_jobs': 'The maximum number of concurrently worker processes. If -1 '
+                  'all CPUs are used. If 1 is given, no parallel computing '
+                  'code is used at all, which is useful for debugging. For '
+                  'n_jobs below -1, (n_cpus + 1 + n_jobs) are used. Thus for '
+                  'n_jobs = -2, all CPUs but one are used.',
+        'pre_dispatch': '"all" or expression, as in "3*n_jobs". The number of '
+                        'batches (of tasks) to be pre-dispatched.'
     }
 )
 
