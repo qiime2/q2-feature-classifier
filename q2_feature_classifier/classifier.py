@@ -141,13 +141,13 @@ def _autodetect_orientation(reads, classifier, n=100,
 
 
 def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
-                     chunk_size: int=262144, n_jobs: int=1,
+                     reads_per_batch: int=262144, n_jobs: int=1,
                      pre_dispatch: str='2*n_jobs', confidence: float=0.7,
                      read_orientation: str=None
                      ) -> pd.DataFrame:
     reads = _autodetect_orientation(
         reads, classifier, read_orientation=read_orientation)
-    predictions = predict(reads, classifier, chunk_size=chunk_size,
+    predictions = predict(reads, classifier, chunk_size=reads_per_batch,
                           n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                           confidence=confidence)
     seq_ids, taxonomy, confidence = list(zip(*predictions))
@@ -157,9 +157,10 @@ def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
     return result
 
 
-_classify_parameters = {'chunk_size': Int, 'n_jobs': Int, 'pre_dispatch': Str,
-                        'confidence': Float, 'read_orientation':
-                        Str % Choices(['same', 'reverse-complement'])}
+_classify_parameters = {
+    'reads_per_batch': Int, 'n_jobs': Int, 'pre_dispatch': Str,
+    'confidence': Float,
+    'read_orientation': Str % Choices(['same', 'reverse-complement'])}
 
 
 plugin.methods.register_function(
@@ -187,7 +188,7 @@ plugin.methods.register_function(
                             'and complemented prior to classification. '
                             'Default is to autodetect based on the '
                             'confidence estimates for the first 100 reads.',
-        'chunk_size': 'Number of reads to process in each batch.',
+        'reads_per_batch': 'Number of reads to process in each batch.',
         'n_jobs': 'The maximum number of concurrently worker processes. If -1 '
                   'all CPUs are used. If 1 is given, no parallel computing '
                   'code is used at all, which is useful for debugging. For '
