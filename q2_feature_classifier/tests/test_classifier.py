@@ -201,7 +201,8 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         for taxon in fc:
             self.assertEqual(fc[taxon], rc[taxon])
 
-        result = classify(reads, self.classifier, chunk_size=100, n_jobs=2)
+        result = classify(reads, self.classifier, reads_per_batch=100,
+                          n_jobs=2)
         cc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
