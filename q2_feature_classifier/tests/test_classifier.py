@@ -14,10 +14,11 @@ from q2_types.feature_data import DNAIterator
 from qiime2.plugins import feature_classifier
 import pandas as pd
 import skbio
+import biom
 
 from q2_feature_classifier._skl import _specific_fitters
 from q2_feature_classifier.classifier import spec_from_pipeline, \
-    pipeline_from_spec
+    pipeline_from_spec, populate_class_weight
 
 from . import FeatureClassifierTestPluginBase
 
@@ -53,6 +54,93 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         for taxon in classified:
             right += ref[taxon].startswith(classified[taxon])
         self.assertGreater(right/len(classified), 0.95)
+
+    def test_populate_class_weight(self):
+        # should populate the class weight of a pipeline
+        weights = Artifact.import_data(
+            'FeatureTable[RelativeFrequency]',
+            self.get_data_path('class_weight.biom'),
+            view_type='BIOMV100Format')
+        table = weights.view(biom.Table)
+
+        svc_spec = [['feat_ext',
+                     {'__type__': 'feature_extraction.text.HashingVectorizer',
+                      'analyzer': 'char_wb',
+                      'n_features': 8192,
+                      'ngram_range': [8, 8],
+                      'alternate_sign': False}],
+                    ['classify',
+                     {'__type__': 'naive_bayes.GaussianNB'}]]
+        pipeline1 = pipeline_from_spec(svc_spec)
+        populate_class_weight(pipeline1, table)
+
+        classes = table.ids('observation')
+        class_weights = []
+        for wts in table.iter_data():
+            class_weights.append(zip(classes, wts))
+        svc_spec[1][1]['priors'] = list(zip(*sorted(class_weights[0])))[1]
+        pipeline2 = pipeline_from_spec(svc_spec)
+
+        for a, b in zip(pipeline1.get_params()['classify__priors'],
+                        pipeline2.get_params()['classify__priors']):
+            self.assertAlmostEqual(a, b)
+
+    def test_class_weight(self):
+        # we should be able to input class_weight to fit_classifier
+        weights = Artifact.import_data(
+            'FeatureTable[RelativeFrequency]',
+            self.get_data_path('class_weight.biom'),
+            view_type='BIOMV100Format')
+        reads = Artifact.import_data(
+            'FeatureData[Sequence]',
+            self.get_data_path('se-dna-sequences.fasta'))
+
+        fitter = feature_classifier.methods.fit_classifier_naive_bayes
+        classifier1 = fitter(reads, self.taxonomy, class_weight=weights)
+        classifier1 = classifier1.classifier
+
+        class_weight = weights.view(biom.Table)
+        classes = class_weight.ids('observation')
+        class_weights = []
+        for wts in class_weight.iter_data():
+            class_weights.append(zip(classes, wts))
+        priors = json.dumps(list(zip(*sorted(class_weights[0])))[1])
+        classifier2 = fitter(reads, self.taxonomy,
+                             classify__class_prior=priors).classifier
+
+        classify = feature_classifier.methods.classify_sklearn
+        result1 = classify(reads, classifier1)
+        result1 = result1.classification.view(pd.Series).to_dict()
+        result2 = classify(reads, classifier2)
+        result2 = result2.classification.view(pd.Series).to_dict()
+        self.assertEqual(result1, result2)
+
+        svc_spec = [['feat_ext',
+                     {'__type__': 'feature_extraction.text.HashingVectorizer',
+                      'analyzer': 'char_wb',
+                      'n_features': 8192,
+                      'ngram_range': [8, 8],
+                      'alternate_sign': False}],
+                    ['classify',
+                     {'__type__': 'linear_model.LogisticRegression'}]]
+        classifier_spec = json.dumps(svc_spec)
+        gen_fitter = feature_classifier.methods.fit_classifier_sklearn
+        classifier1 = gen_fitter(reads, self.taxonomy, classifier_spec,
+                                 class_weight=weights).classifier
+
+        svc_spec[1][1]['class_weight'] = dict(class_weights[0])
+        classifier_spec = json.dumps(svc_spec)
+        gen_fitter = feature_classifier.methods.fit_classifier_sklearn
+        classifier2 = gen_fitter(reads, self.taxonomy, classifier_spec
+                                 ).classifier
+
+        result1 = classify(reads, classifier1)
+        result1 = result1.classification.view(pd.Series).to_dict()
+        result2 = classify(reads, classifier2)
+        result2 = result2.classification.view(pd.Series).to_dict()
+        self.assertEqual(set(result1.keys()), set(result2.keys()))
+        for k in result1:
+            self.assertEqual(result1[k], result2[k])
 
     def test_fit_specific_classifiers(self):
         # specific and general classifiers should produce the same results
