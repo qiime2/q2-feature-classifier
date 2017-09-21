@@ -194,7 +194,7 @@ plugin.methods.register_function(
                   'n_jobs below -1, (n_cpus + 1 + n_jobs) are used. Thus for '
                   'n_jobs = -2, all CPUs but one are used.',
         'pre_dispatch': '"all" or expression, as in "3*n_jobs". The number of '
-                        'jobs (of tasks) to be dispatched during execution.'
+                        'batches (of tasks) to be pre-dispatched.'
     }
 )
 
