@@ -68,7 +68,7 @@ class TestFormats(TaxonomicClassifierTestBase):
         format = self._custom_setup(sklearn.__version__)
 
         # Should not error
-        format._validate_()
+        format.validate()
 
 
 class TestTransformers(TaxonomicClassifierTestBase):
