@@ -11,15 +11,18 @@ import importlib
 import inspect
 import warnings
 from itertools import chain, islice
+import subprocess
 
 import pandas as pd
-from qiime2.plugin import Int, Str, Float, Bool, Choices
-from q2_types.feature_data import FeatureData, Taxonomy, Sequence, DNAIterator
+from qiime2.plugin import Int, Str, Float, Bool, Choices, Range
+from q2_types.feature_data import (
+    FeatureData, Taxonomy, Sequence, DNAIterator, DNAFASTAFormat)
 from q2_types.feature_table import FeatureTable, RelativeFrequency
 from sklearn.pipeline import Pipeline
 import sklearn
 from numpy import median, array
 import biom
+import skbio
 
 from ._skl import fit_pipeline, predict, _specific_fitters
 from ._taxonomic_classifier import TaxonomicClassifier
@@ -172,11 +175,33 @@ def _autodetect_orientation(reads, classifier, n=100,
     return chain(reversed_n_reads, (r.reverse_complement() for r in reads))
 
 
-def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
-                     reads_per_batch: int=262144, n_jobs: int=1,
+def _autotune_reads_per_batch(reads, n_jobs):
+    # detect effective jobs. Will raise error if n_jobs == 0
+    n_jobs = sklearn.externals.joblib.effective_n_jobs(n_jobs)
+    # we really only want to calculate this if running in parallel
+    if n_jobs != 1:
+        seq_count = subprocess.run(
+            ['grep', '-c', '^>', str(reads)], check=True,
+            stdout=subprocess.PIPE)
+        return int(int(seq_count.stdout.decode('utf-8')) / n_jobs)
+    # otherwise reads_per_batch = large value (similar to original default)
+    else:
+        return 500000
+
+
+def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
+                     reads_per_batch: int=0, n_jobs: int=1,
                      pre_dispatch: str='2*n_jobs', confidence: float=0.7,
                      read_orientation: str=None
                      ) -> pd.DataFrame:
+    # autotune reads per batch
+    if reads_per_batch == 0:
+        reads_per_batch = _autotune_reads_per_batch(reads, n_jobs)
+
+    # transform reads to DNAIterator
+    reads = DNAIterator(
+        skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
+
     reads = _autodetect_orientation(
         reads, classifier, read_orientation=read_orientation)
     predictions = predict(reads, classifier, chunk_size=reads_per_batch,
@@ -190,7 +215,9 @@ def classify_sklearn(reads: DNAIterator, classifier: Pipeline,
 
 
 _classify_parameters = {
-    'reads_per_batch': Int, 'n_jobs': Int, 'pre_dispatch': Str,
+    'reads_per_batch': Int % Range(0, None),
+    'n_jobs': Int,
+    'pre_dispatch': Str,
     'confidence': Float,
     'read_orientation': Str % Choices(['same', 'reverse-complement'])}
 
@@ -220,7 +247,9 @@ plugin.methods.register_function(
                             'and complemented prior to classification. '
                             'Default is to autodetect based on the '
                             'confidence estimates for the first 100 reads.',
-        'reads_per_batch': 'Number of reads to process in each batch.',
+        'reads_per_batch': 'Number of reads to process in each batch. If 0, '
+                           'this parameter is autoscaled to '
+                           'the number of query sequences / n_jobs.',
         'n_jobs': 'The maximum number of concurrently worker processes. If -1 '
                   'all CPUs are used. If 1 is given, no parallel computing '
                   'code is used at all, which is useful for debugging. For '
