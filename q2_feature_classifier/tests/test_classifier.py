@@ -234,5 +234,13 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
 
     def test_autotune_reads_per_batch_zero_jobs(self):
         with self.assertRaisesRegex(
-                ValueError, "n_jobs == 0 in Parallel has no meaning"):
+                ValueError, "Value other than zero must be specified"):
             _autotune_reads_per_batch(self.seq_path, n_jobs=0)
+
+    def test_autotune_reads_per_batch_ceil(self):
+        self.assertEqual(
+            _autotune_reads_per_batch(self.seq_path, n_jobs=5), 221)
+
+    def test_autotune_reads_per_batch_more_jobs_than_reads(self):
+        self.assertEqual(
+            _autotune_reads_per_batch(self.seq_path, n_jobs=1105), 1)

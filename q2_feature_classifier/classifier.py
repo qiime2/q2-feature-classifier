@@ -20,7 +20,7 @@ from q2_types.feature_data import (
 from q2_types.feature_table import FeatureTable, RelativeFrequency
 from sklearn.pipeline import Pipeline
 import sklearn
-from numpy import median, array
+from numpy import median, array, ceil
 import biom
 import skbio
 
@@ -177,13 +177,18 @@ def _autodetect_orientation(reads, classifier, n=100,
 
 def _autotune_reads_per_batch(reads, n_jobs):
     # detect effective jobs. Will raise error if n_jobs == 0
-    n_jobs = sklearn.externals.joblib.effective_n_jobs(n_jobs)
+    if n_jobs == 0:
+        raise ValueError("Value other than zero must be specified as number "
+                         "of jobs to run.")
+    else:
+        n_jobs = sklearn.externals.joblib.effective_n_jobs(n_jobs)
+
     # we really only want to calculate this if running in parallel
     if n_jobs != 1:
         seq_count = subprocess.run(
             ['grep', '-c', '^>', str(reads)], check=True,
             stdout=subprocess.PIPE)
-        return int(int(seq_count.stdout.decode('utf-8')) / n_jobs)
+        return int(ceil(int(seq_count.stdout.decode('utf-8')) / n_jobs))
     # otherwise reads_per_batch = large value (similar to original default)
     else:
         return 500000
