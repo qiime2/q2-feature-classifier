@@ -18,7 +18,7 @@ import biom
 
 from q2_feature_classifier._skl import _specific_fitters
 from q2_feature_classifier.classifier import spec_from_pipeline, \
-    pipeline_from_spec, populate_class_weight
+    pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch
 
 from . import FeatureClassifierTestPluginBase
 
@@ -31,8 +31,8 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         self.taxonomy = Artifact.import_data(
             'FeatureData[Taxonomy]', self.get_data_path('taxonomy.tsv'))
 
-        seq_path = self.get_data_path('se-dna-sequences.fasta')
-        reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
+        self.seq_path = self.get_data_path('se-dna-sequences.fasta')
+        reads = Artifact.import_data('FeatureData[Sequence]', self.seq_path)
         fitter_name = _specific_fitters[0][0]
         fitter = getattr(feature_classifier.methods,
                          'fit_classifier_' + fitter_name)
@@ -223,3 +223,24 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             id_ = seq.metadata['id']
             assert ref[id_].startswith(classified[id_]) or \
                 classified[id_] == 'Unassigned'
+
+    def test_autotune_reads_per_batch(self):
+        self.assertEqual(
+            _autotune_reads_per_batch(self.seq_path, n_jobs=4), 276)
+
+    def test_autotune_reads_per_batch_disable_if_single_job(self):
+        self.assertEqual(
+            _autotune_reads_per_batch(self.seq_path, n_jobs=1), 500000)
+
+    def test_autotune_reads_per_batch_zero_jobs(self):
+        with self.assertRaisesRegex(
+                ValueError, "Value other than zero must be specified"):
+            _autotune_reads_per_batch(self.seq_path, n_jobs=0)
+
+    def test_autotune_reads_per_batch_ceil(self):
+        self.assertEqual(
+            _autotune_reads_per_batch(self.seq_path, n_jobs=5), 221)
+
+    def test_autotune_reads_per_batch_more_jobs_than_reads(self):
+        self.assertEqual(
+            _autotune_reads_per_batch(self.seq_path, n_jobs=1105), 1)
