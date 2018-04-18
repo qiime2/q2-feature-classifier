@@ -24,6 +24,7 @@ setup(
         ['q2-feature-classifier=q2_feature_classifier.plugin_setup:plugin']
     },
     package_data={
+        'q2_feature_classifier': ['citations.bib'],
         'q2_feature_classifier.tests': ['data/*'],
     },
     zip_safe=False,
