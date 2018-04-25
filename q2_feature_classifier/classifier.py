@@ -26,7 +26,7 @@ import skbio
 
 from ._skl import fit_pipeline, predict, _specific_fitters
 from ._taxonomic_classifier import TaxonomicClassifier
-from .plugin_setup import plugin
+from .plugin_setup import plugin, citations
 
 
 def _load_class(classname):
@@ -143,7 +143,8 @@ plugin.methods.register_function(
     parameters={'classifier_specification': Str},
     outputs=[('classifier', TaxonomicClassifier)],
     name='Train an almost arbitrary scikit-learn classifier',
-    description='Train a scikit-learn classifier to classify reads.'
+    description='Train a scikit-learn classifier to classify reads.',
+    citations=[citations['pedregosa2011scikit']]
 )
 
 
@@ -262,7 +263,8 @@ plugin.methods.register_function(
                   'n_jobs = -2, all CPUs but one are used.',
         'pre_dispatch': '"all" or expression, as in "3*n_jobs". The number of '
                         'batches (of tasks) to be pre-dispatched.'
-    }
+    },
+    citations=[citations['pedregosa2011scikit']]
 )
 
 
@@ -326,7 +328,8 @@ def _register_fitter(name, spec):
         parameters=parameters,
         outputs=[('classifier', TaxonomicClassifier)],
         name='Train the ' + name + ' classifier',
-        description='Create a scikit-learn ' + name + ' classifier for reads'
+        description='Create a scikit-learn ' + name + ' classifier for reads',
+        citations=[citations['pedregosa2011scikit']]
     )
 
 

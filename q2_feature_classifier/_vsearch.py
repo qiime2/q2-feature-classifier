@@ -9,7 +9,7 @@
 import pandas as pd
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAFASTAFormat)
-from .plugin_setup import plugin
+from .plugin_setup import plugin, citations
 from qiime2.plugin import Int, Str, Float, Choices, Range
 from ._consensus_assignment import (_consensus_assignments,
                                     _get_default_unassignable_label)
@@ -70,5 +70,6 @@ plugin.methods.register_function(
                  'VSEARCH global alignment between query and reference_reads, '
                  'then assigns consensus taxonomy to each query sequence from '
                  'among maxaccepts top hits, min_consensus of which share '
-                 'that taxonomic assignment.')
+                 'that taxonomic assignment.'),
+    citations=[citations['rognes2016vsearch']]
 )
