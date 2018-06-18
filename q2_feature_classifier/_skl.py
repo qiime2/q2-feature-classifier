@@ -17,11 +17,11 @@ _specific_fitters = [
            {'__type__': 'feature_extraction.text.HashingVectorizer',
             'analyzer': 'char_wb',
             'n_features': 8192,
-            'ngram_range': [8, 8],
+            'ngram_range': [7, 7],
             'alternate_sign': False}],
           ['classify',
            {'__type__': 'custom.LowMemoryMultinomialNB',
-            'alpha': 0.01,
+            'alpha': 0.001,
             'fit_prior': False}]]]]
 
 
