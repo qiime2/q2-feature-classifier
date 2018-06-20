@@ -275,6 +275,10 @@ def _pipeline_signature(spec):
     pipeline = pipeline_from_spec(spec)
     params = pipeline.get_params()
     for param, default in sorted(params.items()):
+        # weed out pesky memory parameter from skl
+        # https://github.com/qiime2/q2-feature-classifier/issues/101
+        if param == 'memory':
+            continue
         try:
             json.dumps(default)
         except TypeError:
