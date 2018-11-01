@@ -18,12 +18,12 @@ from ._consensus_assignment import (_consensus_assignments,
 def classify_consensus_vsearch(query: DNAFASTAFormat,
                                reference_reads: DNAFASTAFormat,
                                reference_taxonomy: pd.Series,
-                               maxaccepts: int=10,
-                               perc_identity: int=0.8, strand: str='both',
-                               min_consensus: float=0.51,
-                               unassignable_label: str=
+                               maxaccepts: int = 10,
+                               perc_identity: int = 0.8, strand: str = 'both',
+                               min_consensus: float = 0.51,
+                               unassignable_label: str =
                                _get_default_unassignable_label(),
-                               threads: str=1) -> pd.DataFrame:
+                               threads: str = 1) -> pd.DataFrame:
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
     cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(perc_identity),
