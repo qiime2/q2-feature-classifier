@@ -41,7 +41,7 @@ plugin.methods.register_function(
     inputs={'query': FeatureData[Sequence],
             'reference_reads': FeatureData[Sequence],
             'reference_taxonomy': FeatureData[Taxonomy]},
-    parameters={'maxaccepts': Int % Range(1, None),
+    parameters={'maxaccepts': Int % Range(0, None),
                 'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
                 'strand': Str % Choices(['both', 'plus']),
                 'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
@@ -55,7 +55,8 @@ plugin.methods.register_function(
     parameter_descriptions={
         'strand': ('Align against reference sequences in forward ("plus") '
                    'or both directions ("both").'),
-        'maxaccepts': ('Maximum number of hits to keep for each query. Must '
+        'maxaccepts': ('Maximum number of hits to keep for each query. Set to '
+                       '0 to keep all hits > perc_identity similarity. Must '
                        'be in range [0, infinity].'),
         'perc_identity': ('Reject match if percent identity to query is '
                           'lower. Must be in range [0.0, 1.0].'),

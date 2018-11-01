@@ -57,7 +57,7 @@ plugin.methods.register_function(
         'strand': ('Align against reference sequences in forward ("plus"), '
                    'reverse ("minus"), or both directions ("both").'),
         'maxaccepts': ('Maximum number of hits to keep for each query. Must '
-                       'be in range [0, infinity].'),
+                       'be in range [1, infinity].'),
         'perc_identity': ('Reject match if percent identity to query is '
                           'lower. Must be in range [0.0, 1.0].'),
         'min_consensus': ('Minimum fraction of assignments must match top '
