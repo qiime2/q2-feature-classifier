@@ -125,7 +125,7 @@ def populate_class_weight(pipeline, class_weight):
 def fit_classifier_sklearn(reference_reads: DNAIterator,
                            reference_taxonomy: pd.Series,
                            classifier_specification: str,
-                           class_weight: biom.Table=None) -> Pipeline:
+                           class_weight: biom.Table = None) -> Pipeline:
     warn_about_sklearn()
     spec = json.loads(classifier_specification)
     pipeline = pipeline_from_spec(spec)
@@ -196,9 +196,9 @@ def _autotune_reads_per_batch(reads, n_jobs):
 
 
 def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
-                     reads_per_batch: int=0, n_jobs: int=1,
-                     pre_dispatch: str='2*n_jobs', confidence: float=0.7,
-                     read_orientation: str=None
+                     reads_per_batch: int = 0, n_jobs: int = 1,
+                     pre_dispatch: str = '2*n_jobs', confidence: float = 0.7,
+                     read_orientation: str = None
                      ) -> pd.DataFrame:
     # autotune reads per batch
     if reads_per_batch == 0:
@@ -301,7 +301,7 @@ def _register_fitter(name, spec):
 
     def generic_fitter(reference_reads: DNAIterator,
                        reference_taxonomy: pd.Series,
-                       class_weight: biom.Table=None, **kwargs) -> Pipeline:
+                       class_weight: biom.Table = None, **kwargs) -> Pipeline:
         warn_about_sklearn()
         for param in kwargs:
             try:
