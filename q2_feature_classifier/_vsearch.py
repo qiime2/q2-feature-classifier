@@ -71,6 +71,8 @@ plugin.methods.register_function(
                  'VSEARCH global alignment between query and reference_reads, '
                  'then assigns consensus taxonomy to each query sequence from '
                  'among maxaccepts top hits, min_consensus of which share '
-                 'that taxonomic assignment.'),
+                 'that taxonomic assignment. Unlike classify-consensus-blast, '
+                 'this method searches the entire reference database before '
+                 'choosing the top N hits, not the first N hits.'),
     citations=[citations['rognes2016vsearch']]
 )
