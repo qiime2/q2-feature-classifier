@@ -57,7 +57,9 @@ plugin.methods.register_function(
         'strand': ('Align against reference sequences in forward ("plus"), '
                    'reverse ("minus"), or both directions ("both").'),
         'maxaccepts': ('Maximum number of hits to keep for each query. Must '
-                       'be in range [0, infinity].'),
+                       'be in range [0, infinity]. BLAST will choose the '
+                       'first N hits in the reference database that exceed '
+                       'perc_identity similarity to query.'),
         'perc_identity': ('Reject match if percent identity to query is '
                           'lower. Must be in range [0.0, 1.0].'),
         'min_consensus': ('Minimum fraction of assignments must match top '
@@ -70,7 +72,10 @@ plugin.methods.register_function(
     description=('Assign taxonomy to query sequences using BLAST+. Performs '
                  'BLAST+ local alignment between query and reference_reads, '
                  'then assigns consensus taxonomy to each query sequence from '
-                 'among maxaccepts top hits, min_consensus of which share '
-                 'that taxonomic assignment.'),
+                 'among maxaccepts hits, min_consensus of which share '
+                 'that taxonomic assignment. Note that maxaccepts selects the '
+                 'first N hits with > perc_identity similarity to query, '
+                 'not the top N matches. For top N hits, use '
+                 'classify-consensus-vsearch.'),
     citations=[citations['camacho2009blast+']]
 )
