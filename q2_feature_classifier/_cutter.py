@@ -8,7 +8,7 @@
 
 from itertools import chain
 
-from qiime2.plugin import Int, Str, Float
+from qiime2.plugin import Int, Str, Float, Range
 from q2_types.feature_data import FeatureData, Sequence, DNAIterator
 import skbio
 
@@ -98,7 +98,8 @@ def _approx_match(seq, f_primer, r_primer, identity):
     return None
 
 
-def _gen_reads(sequences,  f_primer, r_primer, trunc_len, trim_left, identity):
+def _gen_reads(sequences,  f_primer, r_primer, trunc_len, trim_left, identity,
+               min_length, max_length):
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
     for seq in sequences:
@@ -112,10 +113,15 @@ def _gen_reads(sequences,  f_primer, r_primer, trunc_len, trim_left, identity):
                 seq.reverse_complement(), f_primer, r_primer, identity)
         if not amp:
             continue
+        # we want to filter by max length before trimming
+        if max_length > 0 and len(amp) > max_length:
+            continue
         if trunc_len > 0:
             amp = amp[:trunc_len]
         if trim_left > 0:
             amp = amp[trim_left:]
+        if min_length > 0 and len(amp) < min_length:
+            continue
         if not amp:
             continue
         yield amp
@@ -123,7 +129,8 @@ def _gen_reads(sequences,  f_primer, r_primer, trunc_len, trim_left, identity):
 
 def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
                   trunc_len: int = 0, trim_left: int = 0,
-                  identity: float = 0.8) -> DNAIterator:
+                  identity: float = 0.8, min_length: int = 50,
+                  max_length: int = 0) -> DNAIterator:
     """Extract the read selected by a primer or primer pair. Only sequences
     which match the primers at greater than the specified identity are returned
 
@@ -143,14 +150,18 @@ def extract_reads(sequences: DNAIterator,  f_primer: str, r_primer: str,
         positive. Applied after trunc_len.
     identity : float, optional
         minimum combined primer match identity threshold. Default: 0.8
-
+    min_length: int, optional
+        Minimum amplicon length. Shorter amplicons are discarded. Default: 50
+    max_length: int, optional
+        Maximum amplicon length. Longer amplicons are discarded.
     Returns
     -------
     q2_types.DNAIterator
         containing the reads
     """
     reads = _gen_reads(
-        sequences, f_primer, r_primer, trunc_len, trim_left, identity)
+        sequences, f_primer, r_primer, trunc_len, trim_left, identity,
+        min_length, max_length)
     try:
         first_read = next(reads)
     except StopIteration:
@@ -165,17 +176,32 @@ plugin.methods.register_function(
                 'trim_left': Int,
                 'f_primer': Str,
                 'r_primer': Str,
-                'identity': Float},
+                'identity': Float,
+                'min_length': Int % Range(0, None),
+                'max_length': Int % Range(0, None)},
     outputs=[('reads', FeatureData[Sequence])],
     name='Extract reads from reference',
     description='Extract sequencing-like reads from a reference database.',
     parameter_descriptions={'f_primer': 'forward primer sequence',
                             'r_primer': 'reverse primer sequence',
                             'trunc_len': 'read is cut to trunc_len if '
-                            'trunc_len is positive. Applied before trim_left.',
-                            'trim_left': "trim_left nucleotides are removed "
-                            "from the 5' end if trim_left is positive. "
-                            "Applied after trunc_len.",
+                                         'trunc_len is positive. Applied '
+                                         'before trim_left.',
+                            'trim_left': 'trim_left nucleotides are removed '
+                                         'from the 5\' end if trim_left is '
+                                         'positive. Applied after trunc_len.',
                             'identity': 'minimum combined primer match '
-                            'identity threshold.'}
+                                        'identity threshold.',
+                            'min_length': 'Minimum amplicon length. Shorter '
+                                          'amplicons are discarded. Applied '
+                                          'after trimming and truncation, so '
+                                          'be aware that trimming may impact '
+                                          'sequence retention. Set to zero '
+                                          'to disable min length filtering.',
+                            'max_length': 'Maximum amplicon length. Longer '
+                                          'amplicons are discarded. Applied '
+                                          'before trimming and truncation, '
+                                          'so plan accordingly. Set to zero '
+                                          '(default) to disable max length '
+                                          'filtering.'}
 )

@@ -43,7 +43,8 @@ class CutterTests(FeatureClassifierTestPluginBase):
                 with self.assertRaisesRegex(RuntimeError, "No matches found"):
                     result = extract_reads(
                         self.sequences, f_primer=f_primer, r_primer=r_primer,
-                        trunc_len=trunc_len, trim_left=trim_left, identity=0.9)
+                        trunc_len=trunc_len, trim_left=trim_left, identity=0.9,
+                        min_length=0, max_length=0)
                 continue
             result = extract_reads(
                 self.sequences, f_primer=f_primer, r_primer=r_primer,
