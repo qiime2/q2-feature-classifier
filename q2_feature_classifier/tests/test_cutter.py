@@ -48,7 +48,8 @@ class CutterTests(FeatureClassifierTestPluginBase):
                 continue
             result = extract_reads(
                 self.sequences, f_primer=f_primer, r_primer=r_primer,
-                trunc_len=trunc_len, trim_left=trim_left, identity=0.9)
+                trunc_len=trunc_len, trim_left=trim_left, identity=0.9,
+                min_length=0, max_length=0)
             self.assertEqual(result.reads.type, FeatureData[Sequence])
             outseqs = list(result.reads.view(DNAIterator))
             self.assertGreater(len(outseqs), 0)
@@ -63,3 +64,14 @@ class CutterTests(FeatureClassifierTestPluginBase):
             else:
                 for seq, raw_len in zip(outseqs, raw_lens):
                     self.assertEqual(len(seq), raw_len - trim_left)
+            # test that length filtering is working
+            with self.assertRaisesRegex(RuntimeError, "No matches found"):
+                result = extract_reads(
+                    self.sequences, f_primer=f_primer, r_primer=r_primer,
+                    trunc_len=trunc_len, trim_left=trim_left, identity=0.9,
+                    min_length=500, max_length=0)
+            with self.assertRaisesRegex(RuntimeError, "No matches found"):
+                result = extract_reads(
+                    self.sequences, f_primer=f_primer, r_primer=r_primer,
+                    trunc_len=trunc_len, trim_left=trim_left, identity=0.9,
+                    min_length=0, max_length=20)
