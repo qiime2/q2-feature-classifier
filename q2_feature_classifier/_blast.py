@@ -16,18 +16,21 @@ from ._consensus_assignment import (_consensus_assignments,
 
 
 def classify_consensus_blast(
-    query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
-    reference_taxonomy: pd.Series, maxaccepts: int = 10,
-        perc_identity: float = 0.8, strand: str = 'both',
-        evalue: float = 0.001, min_consensus: float = 0.51,
+        query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
+        reference_taxonomy: pd.Series, maxaccepts: int = 10,
+        perc_identity: float = 0.8, query_cov: float = 0.8,
+        strand: str = 'both', evalue: float = 0.001,
+        min_consensus: float = 0.51,
         unassignable_label: str = _get_default_unassignable_label(),
         ) -> pd.DataFrame:
     perc_identity = perc_identity * 100
+    query_cov = query_cov * 100
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
     cmd = ['blastn', '-query', seqs_fp, '-evalue', str(evalue), '-strand',
            strand, '-outfmt', '7', '-subject', ref_fp, '-perc_identity',
-           str(perc_identity), '-max_target_seqs', str(maxaccepts), '-out']
+           str(perc_identity), '-qcov_hsp_perc', str(query_cov),
+           '-max_target_seqs', str(maxaccepts), '-out']
     consensus = _consensus_assignments(
         cmd, reference_taxonomy, unassignable_label=unassignable_label,
         min_consensus=min_consensus, output_no_hits=True,
@@ -44,6 +47,7 @@ plugin.methods.register_function(
     parameters={'evalue': Float,
                 'maxaccepts': Int % Range(1, None),
                 'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
+                'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
                 'strand': Str % Choices(['both', 'plus', 'minus']),
                 'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
                                                inclusive_start=False),
@@ -62,6 +66,11 @@ plugin.methods.register_function(
                        'perc_identity similarity to query.'),
         'perc_identity': ('Reject match if percent identity to query is '
                           'lower. Must be in range [0.0, 1.0].'),
+        'query_cov': 'Reject match if query alignment coverage per high-'
+                     'scoring pair is lower. Note: this uses blastn\'s '
+                     'qcov_hsp_perc parameter, and may not behave identically '
+                     'to the query_cov parameter used by classify-consensus-'
+                     'vsearch. Must be in range [0.0, 1.0].',
         'min_consensus': ('Minimum fraction of assignments must match top '
                           'hit to be accepted as consensus assignment. Must '
                           'be in range (0.5, 1.0].')

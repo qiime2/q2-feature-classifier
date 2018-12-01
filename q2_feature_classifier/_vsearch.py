@@ -19,7 +19,9 @@ def classify_consensus_vsearch(query: DNAFASTAFormat,
                                reference_reads: DNAFASTAFormat,
                                reference_taxonomy: pd.Series,
                                maxaccepts: int = 10,
-                               perc_identity: int = 0.8, strand: str = 'both',
+                               perc_identity: int = 0.8,
+                               query_cov: float = 0.8,
+                               strand: str = 'both',
                                min_consensus: float = 0.51,
                                unassignable_label: str =
                                _get_default_unassignable_label(),
@@ -27,9 +29,9 @@ def classify_consensus_vsearch(query: DNAFASTAFormat,
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
     cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(perc_identity),
-           '--strand', strand, '--maxaccepts', str(maxaccepts),
-           '--maxrejects', '0', '--output_no_hits', '--db', ref_fp,
-           '--threads', str(threads), '--blast6out']
+           '--query_cov', str(query_cov), '--strand', strand, '--maxaccepts',
+           str(maxaccepts), '--maxrejects', '0', '--output_no_hits', '--db',
+           ref_fp, '--threads', str(threads), '--blast6out']
     consensus = _consensus_assignments(
         cmd, reference_taxonomy, min_consensus=min_consensus,
         unassignable_label=unassignable_label)
@@ -43,6 +45,7 @@ plugin.methods.register_function(
             'reference_taxonomy': FeatureData[Taxonomy]},
     parameters={'maxaccepts': Int % Range(0, None),
                 'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
+                'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
                 'strand': Str % Choices(['both', 'plus']),
                 'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
                                                inclusive_start=False),
@@ -60,6 +63,8 @@ plugin.methods.register_function(
                        'be in range [0, infinity].'),
         'perc_identity': ('Reject match if percent identity to query is '
                           'lower. Must be in range [0.0, 1.0].'),
+        'query_cov': 'Reject match if query alignment coverage per high-'
+                     'scoring pair is lower. Must be in range [0.0, 1.0].',
         'min_consensus': ('Minimum fraction of assignments must match top '
                           'hit to be accepted as consensus assignment. Must '
                           'be in range (0.5, 1.0].')
