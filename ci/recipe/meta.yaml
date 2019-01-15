@@ -13,13 +13,12 @@ build:
   script: make install
 
 requirements:
-  build:
-    - python 3.5*
+  host:
+    - python {{ python }}
     - setuptools
 
   run:
-    - python 3.5*
-    - setuptools
+    - python {{ python }}
     - scikit-learn 0.19.1
     - scikit-bio
     - biom-format >=2.1.5,<2.2.0
