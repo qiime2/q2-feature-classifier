@@ -230,7 +230,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
 
     def test_autotune_reads_per_batch_disable_if_single_job(self):
         self.assertEqual(
-            _autotune_reads_per_batch(self.seq_path, n_jobs=1), 500000)
+            _autotune_reads_per_batch(self.seq_path, n_jobs=1), 20000)
 
     def test_autotune_reads_per_batch_zero_jobs(self):
         with self.assertRaisesRegex(
