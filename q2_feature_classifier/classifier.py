@@ -189,10 +189,12 @@ def _autotune_reads_per_batch(reads, n_jobs):
         seq_count = subprocess.run(
             ['grep', '-c', '^>', str(reads)], check=True,
             stdout=subprocess.PIPE)
-        return int(ceil(int(seq_count.stdout.decode('utf-8')) / n_jobs))
-    # otherwise reads_per_batch = large value (similar to original default)
+        # set a max value to avoid blowing up memory
+        return min(int(ceil(int(seq_count.stdout.decode('utf-8')) / n_jobs)),
+                   20000)
+    # otherwise reads_per_batch = 20000, which has a modest memory overhead
     else:
-        return 500000
+        return 20000
 
 
 def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
@@ -255,7 +257,7 @@ plugin.methods.register_function(
                             'confidence estimates for the first 100 reads.',
         'reads_per_batch': 'Number of reads to process in each batch. If 0, '
                            'this parameter is autoscaled to '
-                           'the number of query sequences / n_jobs.',
+                           'min( number of query sequences / n_jobs, 20000).',
         'n_jobs': 'The maximum number of concurrently worker processes. If -1 '
                   'all CPUs are used. If 1 is given, no parallel computing '
                   'code is used at all, which is useful for debugging. For '
