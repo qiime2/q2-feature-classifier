@@ -11,6 +11,7 @@ import subprocess
 import pandas as pd
 from os.path import isfile
 from collections import Counter, defaultdict
+import qiime2
 
 
 def _get_default_unassignable_label():
@@ -242,3 +243,9 @@ def _compute_consensus_annotation(annotations, min_consensus,
         consensus_fraction_result = 1.0
 
     return annotation, consensus_fraction_result
+
+
+def _annotate_method(taxa, method):
+    taxa = taxa.view(pd.DataFrame)
+    taxa['method'] = method
+    return qiime2.Artifact.import_data('FeatureData[Taxonomy]', taxa)

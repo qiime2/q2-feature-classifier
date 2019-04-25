@@ -15,7 +15,8 @@ from q2_types.feature_data import (
 from .plugin_setup import plugin, citations
 from qiime2.plugin import Int, Str, Float, Choices, Range, Bool
 from ._consensus_assignment import (_consensus_assignments, _run_command,
-                                    _get_default_unassignable_label)
+                                    _get_default_unassignable_label,
+                                    _annotate_method)
 from ._taxonomic_classifier import TaxonomicClassifier
 
 
@@ -92,9 +93,18 @@ def classify_hybrid_vsearch_sklearn(ctx,
                  strand=strand, min_consensus=min_consensus,
                  search_exact=True, threads=threads)
 
+    # Annotate taxonomic assignments with classification method
+    taxa1 = _annotate_method(taxa1, 'VSEARCH')
+
+    # perform second pass classification on unassigned taxa
     # filter out unassigned seqs
-    query, = filter_seqs(sequences=query, taxonomy=taxa1,
-                         include=_get_default_unassignable_label())
+    try:
+        query, = filter_seqs(sequences=query, taxonomy=taxa1,
+                             include=_get_default_unassignable_label())
+    except ValueError:
+        # get ValueError if all sequences are filtered out.
+        # so if no sequences are unassigned, return exact match results
+        return taxa1
 
     # classify with sklearn classifier
     taxa2, = cs(reads=query, classifier=classifier,
@@ -102,11 +112,6 @@ def classify_hybrid_vsearch_sklearn(ctx,
                 confidence=confidence, read_orientation=read_orientation)
 
     # Annotate taxonomic assignments with classification method
-    def _annotate_method(taxa, method):
-        taxa = taxa.view(pd.DataFrame)
-        taxa['method'] = method
-        return qiime2.Artifact.import_data('FeatureData[Taxonomy]', taxa)
-    taxa1 = _annotate_method(taxa1, 'VSEARCH')
     taxa2 = _annotate_method(taxa2, 'sklearn')
 
     # merge into one big happy result
