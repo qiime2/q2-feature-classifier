@@ -77,6 +77,7 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
             right += tax[taxon].startswith(res[taxon])
         self.assertGreater(right/len(res), 0.5)
 
+
 class HybridClassiferTests(FeatureClassifierTestPluginBase):
     package = 'q2_feature_classifier.tests'
 
