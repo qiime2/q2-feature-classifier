@@ -107,7 +107,7 @@ def classify_hybrid_vsearch_sklearn(ctx,
         taxa['method'] = method
         return qiime2.Artifact.import_data('FeatureData[Taxonomy]', taxa)
     taxa1 = _annotate_method(taxa1, 'VSEARCH')
-    taxa1 = _annotate_method(taxa2, 'sklearn')
+    taxa2 = _annotate_method(taxa2, 'sklearn')
 
     # merge into one big happy result
     taxa, = merge(data=[taxa2, taxa1])
