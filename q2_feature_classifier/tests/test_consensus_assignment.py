@@ -9,8 +9,11 @@
 import pandas as pd
 
 from qiime2.sdk import Artifact
+from qiime2.plugins import feature_classifier
+from q2_feature_classifier._skl import _specific_fitters
 from q2_feature_classifier._blast import classify_consensus_blast
-from q2_feature_classifier._vsearch import classify_consensus_vsearch
+from q2_feature_classifier._vsearch import (
+    classify_consensus_vsearch, classify_hybrid_vsearch_sklearn)
 from q2_feature_classifier._consensus_assignment import (
     _compute_consensus_annotation,
     _compute_consensus_annotations,
@@ -28,6 +31,7 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
         taxonomy = Artifact.import_data(
             'FeatureData[Taxonomy]', self.get_data_path('taxonomy.tsv'))
         self.taxonomy = taxonomy.view(pd.Series)
+        self.taxartifact = taxonomy
         # TODO: use `Artifact.import_data` here once we have a transformer
         # for DNASequencesDirectoryFormat -> DNAFASTAFormat
         self.reads_fp = self.get_data_path('se-dna-sequences.fasta')
@@ -48,6 +52,47 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
     def test_vsearch(self):
         result = classify_consensus_vsearch(self.reads, self.reads,
                                             self.taxonomy)
+        res = result.Taxon.to_dict()
+        tax = self.taxonomy.to_dict()
+        right = 0.
+        for taxon in res:
+            right += tax[taxon].startswith(res[taxon])
+        self.assertGreater(right/len(res), 0.5)
+
+    def test_vsearch_search_exact(self):
+        result = classify_consensus_vsearch(self.reads, self.reads,
+                                            self.taxonomy, search_exact=True)
+        res = result.Taxon.to_dict()
+        tax = self.taxonomy.to_dict()
+        right = 0.
+        for taxon in res:
+            right += tax[taxon].startswith(res[taxon])
+        self.assertGreater(right/len(res), 0.5)
+
+    def test_vsearch_top_hits_only(self):
+        result = classify_consensus_vsearch(self.reads, self.reads,
+                                            self.taxonomy, top_hits_only=True)
+        res = result.Taxon.to_dict()
+        tax = self.taxonomy.to_dict()
+        right = 0.
+        for taxon in res:
+            right += tax[taxon].startswith(res[taxon])
+        self.assertGreater(right/len(res), 0.5)
+
+    def test_classify_hybrid_vsearch_sklearn(self):
+        fitter = getattr(feature_classifier.methods,
+                         'fit_classifier_' + _specific_fitters[0][0])
+        reads = Artifact.import_data('FeatureData[Sequence]', self.reads)
+        classifier = fitter(reads, self.taxartifact).classifier
+
+        result, = feature_classifier.actions.classify_hybrid_vsearch_sklearn(
+            query=reads, reference_reads=reads,
+            reference_taxonomy=self.taxartifact, classifier=classifier,
+            prefilter=False)
+        result, = feature_classifier.actions.classify_hybrid_vsearch_sklearn(
+            query=reads, reference_reads=reads,
+            reference_taxonomy=self.taxartifact, classifier=classifier)
+        result = result.view(pd.DataFrame)
         res = result.Taxon.to_dict()
         tax = self.taxonomy.to_dict()
         right = 0.
