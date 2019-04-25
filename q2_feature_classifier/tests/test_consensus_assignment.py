@@ -12,8 +12,7 @@ from qiime2.sdk import Artifact
 from qiime2.plugins import feature_classifier
 from q2_feature_classifier._skl import _specific_fitters
 from q2_feature_classifier._blast import classify_consensus_blast
-from q2_feature_classifier._vsearch import (
-    classify_consensus_vsearch, classify_hybrid_vsearch_sklearn)
+from q2_feature_classifier._vsearch import classify_consensus_vsearch
 from q2_feature_classifier._consensus_assignment import (
     _compute_consensus_annotation,
     _compute_consensus_annotations,
