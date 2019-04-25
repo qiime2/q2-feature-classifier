@@ -94,15 +94,23 @@ def classify_hybrid_vsearch_sklearn(ctx,
 
     # filter out unassigned seqs
     query, = filter_seqs(sequences=query, taxonomy=taxa1,
-                         exclude=_get_default_unassignable_label())
+                         include=_get_default_unassignable_label())
 
     # classify with sklearn classifier
     taxa2, = cs(reads=query, classifier=classifier,
                 reads_per_batch=reads_per_batch, n_jobs=threads,
                 confidence=confidence, read_orientation=read_orientation)
 
+    # Annotate taxonomic assignments with classification method
+    def _annotate_method(taxa, method):
+        taxa = taxa.view(pd.DataFrame)
+        taxa['method'] = method
+        return qiime2.Artifact.import_data('FeatureData[Taxonomy]', taxa)
+    taxa1 = _annotate_method(taxa1, 'VSEARCH')
+    taxa1 = _annotate_method(taxa2, 'sklearn')
+
     # merge into one big happy result
-    taxa, = merge(data=[taxa1, taxa2])
+    taxa, = merge(data=[taxa2, taxa1])
     return taxa
 
 

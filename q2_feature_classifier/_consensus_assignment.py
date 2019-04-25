@@ -40,7 +40,7 @@ def _consensus_assignments(
             consensus = {'': ('', '')}
         result = pd.DataFrame.from_dict(consensus, 'index')
         result.index.name = 'Feature ID'
-        result.columns = ['Taxon', 'Confidence']
+        result.columns = ['Taxon', 'Consensus']
         return result
 
 
