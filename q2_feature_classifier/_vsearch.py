@@ -213,7 +213,10 @@ plugin.pipelines.register_function(
                       'sklearn classifier. Provide -1 to disable confidence '
                       'calculation, or 0 to calculate confidence but not '
                       'apply it to limit the taxonomic depth of the '
-                      'assignments.',
+                      'assignments. Note that confidence scores should be '
+                      'interpreted differently depending on the sklearn '
+                      'classifier that is used for classification. Refer to: '
+                      'https://scikit-learn.org/stable/documentation.html',
         'read_orientation': 'Direction of reads with respect to reference '
                             'sequences in pre-trained sklearn classifier. '
                             'same will cause reads to be classified unchanged'
@@ -225,7 +228,7 @@ plugin.pipelines.register_function(
         'reads_per_batch': 'Number of reads to process in each batch for '
                            'sklearn classification. If 0, this parameter is '
                            'autoscaled to min( number of query sequences / '
-                           'n_jobs, 20000).',
+                           'threads, 20000).',
         'prefilter': 'Toggle positive filter of query sequences on or off.'
     },
     output_descriptions=output_descriptions,
