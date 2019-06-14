@@ -13,13 +13,16 @@ build:
   script: make install
 
 requirements:
+  build:
+    run_exports:
+      - {{ pin_subpackage('scikit-learn', max_pin='x.x.x') }}
+
   host:
     - python {{ python }}
     - setuptools
 
   run:
     - python {{ python }}
-    - {{ pin_compatible('scikit-learn', exact=True) }}
     - scikit-bio
     - biom-format >=2.1.5,<2.2.0
     - blast >=2.6.0
