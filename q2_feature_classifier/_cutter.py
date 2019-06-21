@@ -151,7 +151,7 @@ def extract_reads(sequences: DNASequencesDirectoryFormat,  f_primer: str,
         Read is cut to trunc_len if trunc_len is positive. Applied before
         trim_left.
     trim_left : int, optional
-        Trim_left nucleotides are removed from the 5' end if trim_left is
+        `trim_left` nucleotides are removed from the 5' end if trim_left is
         positive. Applied after trunc_len.
     identity : float, optional
         Minimum combined primer match identity threshold. Default: 0.8
@@ -228,10 +228,10 @@ plugin.methods.register_function(
                                           'so plan accordingly. Set to zero '
                                           '(default) to disable max length '
                                           'filtering.',
-                            'n_jobs': 'Number of seperate processes to run. '
-                                      'Default is one.',
-                            'batch_size': 'Number of sequences per batch '
-                                          'passed to processes. Defualt is '
-                                          'auto calculated based on number of '
-                                          'sequences and n_jobs.'}
+                            'n_jobs': 'Number of seperate processes to run.',
+                            'batch_size': 'Number of sequences to process in '
+                                          'a batch. The `auto` option is '
+                                          'calculated from the number of '
+                                          'sequences and number of jobs '
+                                          'specified.'}
 )
