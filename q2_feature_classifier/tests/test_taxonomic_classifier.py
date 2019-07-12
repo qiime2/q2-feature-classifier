@@ -14,7 +14,7 @@ import os
 import shutil
 
 import sklearn
-from sklearn.externals import joblib
+import joblib
 from sklearn.pipeline import Pipeline
 from qiime2.sdk import Artifact
 from qiime2.plugins.feature_classifier.methods import \

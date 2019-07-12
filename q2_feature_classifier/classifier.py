@@ -23,6 +23,7 @@ import sklearn
 from numpy import median, array, ceil
 import biom
 import skbio
+import joblib
 
 from ._skl import fit_pipeline, predict, _specific_fitters
 from ._taxonomic_classifier import TaxonomicClassifier
@@ -182,7 +183,7 @@ def _autotune_reads_per_batch(reads, n_jobs):
         raise ValueError("Value other than zero must be specified as number "
                          "of jobs to run.")
     else:
-        n_jobs = sklearn.externals.joblib.effective_n_jobs(n_jobs)
+        n_jobs = joblib.effective_n_jobs(n_jobs)
 
     # we really only want to calculate this if running in parallel
     if n_jobs != 1:
