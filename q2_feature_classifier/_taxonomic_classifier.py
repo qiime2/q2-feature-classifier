@@ -11,7 +11,7 @@ import tarfile
 import os
 
 import sklearn
-from sklearn.externals import joblib
+import joblib
 from sklearn.pipeline import Pipeline
 import qiime2.plugin
 import qiime2.plugin.model as model

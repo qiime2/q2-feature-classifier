@@ -9,7 +9,7 @@
 from itertools import islice, repeat
 from copy import deepcopy
 
-from sklearn.externals.joblib import Parallel, delayed
+from joblib import Parallel, delayed
 
 _specific_fitters = [
         ['naive_bayes',
