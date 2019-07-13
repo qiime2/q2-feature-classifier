@@ -8,7 +8,7 @@
 
 import skbio
 import os
-from sklearn.externals.joblib import Parallel, delayed, effective_n_jobs
+from joblib import Parallel, delayed, effective_n_jobs
 
 from qiime2.plugin import Int, Str, Float, Range
 from q2_types.feature_data import (FeatureData, Sequence, DNAIterator,
