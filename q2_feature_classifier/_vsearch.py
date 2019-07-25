@@ -36,6 +36,8 @@ def classify_consensus_vsearch(query: DNAFASTAFormat,
                                threads: str = 1) -> pd.DataFrame:
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
+    if maxaccepts == 'all':
+        maxaccepts = 0
     cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(perc_identity),
            '--query_cov', str(query_cov), '--strand', strand, '--maxaccepts',
            str(maxaccepts), '--maxrejects', '0', '--output_no_hits', '--db',
@@ -143,7 +145,7 @@ parameter_descriptions = {
     'strand': 'Align against reference sequences in forward ("plus") '
               'or both directions ("both").',
     'maxaccepts': 'Maximum number of hits to keep for each query. Set to '
-                  '0 to keep all hits > perc_identity similarity. Must '
+                  '"all" to keep all hits > perc_identity similarity. Must '
                   'be in range [0, infinity].',
     'perc_identity': 'Reject match if percent identity to query is '
                      'lower. Must be in range [0.0, 1.0].',
