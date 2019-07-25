@@ -122,7 +122,7 @@ def classify_hybrid_vsearch_sklearn(ctx,
 output_descriptions = {
     'classification': 'The resulting taxonomy classifications.'}
 
-parameters = {'maxaccepts': Int % Range(0, None),
+parameters = {'maxaccepts': Int % Range(1, None) | Str % Choices(['all']),
               'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
               'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
               'strand': Str % Choices(['both', 'plus']),
