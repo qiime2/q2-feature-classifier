@@ -18,7 +18,7 @@ from ._consensus_assignment import (_consensus_assignments, _run_command,
                                     _get_default_unassignable_label,
                                     _annotate_method)
 from ._taxonomic_classifier import TaxonomicClassifier
-from .classifier import _classify_parameters
+from .classifier import _classify_parameters, _parameter_descriptions
 
 
 def classify_consensus_vsearch(query: DNAFASTAFormat,
@@ -226,7 +226,8 @@ plugin.pipelines.register_function(
     },
     output_descriptions=output_descriptions,
     name='ALPHA Hybrid classifier: VSEARCH exact match + sklearn classifier',
-    description=('NOTE: THIS PIPELINE IS AN ALPHA RELEASE. Please report bugs to https://forum.qiime2.org!\n'
+    description=('NOTE: THIS PIPELINE IS AN ALPHA RELEASE. Please report bugs '
+                 'to https://forum.qiime2.org!\n'
                  'Assign taxonomy to query sequences using hybrid classifier. '
                  'First performs rough positive filter to remove artifact and '
                  'low-coverage sequences (use "prefilter" parameter to toggle '

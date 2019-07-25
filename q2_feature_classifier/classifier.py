@@ -268,7 +268,7 @@ plugin.methods.register_function(
         'reads': 'The feature data to be classified.',
         'classifier': 'The taxonomic classifier for classifying the reads.'
     },
-    parameter_descriptions={_parameter_descriptions},
+    parameter_descriptions={**_parameter_descriptions},
     citations=[citations['pedregosa2011scikit']]
 )
 
