@@ -227,7 +227,7 @@ plugin.pipelines.register_function(
                             'reads.',
         'reads_per_batch': 'Number of reads to process in each batch for '
                            'sklearn classification. If 0, this parameter is '
-                           'autoscaled to min( number of query sequences / '
+                           'autoscaled to min(number of query sequences / '
                            'threads, 20000).',
         'prefilter': 'Toggle positive filter of query sequences on or off.'
     },
