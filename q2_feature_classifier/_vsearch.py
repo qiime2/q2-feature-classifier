@@ -123,7 +123,7 @@ def classify_hybrid_vsearch_sklearn(ctx,
 output_descriptions = {
     'classification': 'The resulting taxonomy classifications.'}
 
-parameters = {'maxaccepts': Int % Range(0, None),
+parameters = {'maxaccepts': Int % Range(1, None) | Str % Choices(['all']),
               'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
               'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
               'strand': Str % Choices(['both', 'plus']),
@@ -220,13 +220,13 @@ plugin.pipelines.register_function(
                             'for the first 100 reads.',
         'reads_per_batch': 'Number of reads to process in each batch for '
                            'sklearn classification. If 0, this parameter is '
-                           'autoscaled to min( number of query sequences / '
+                           'autoscaled to min(number of query sequences / '
                            'threads, 20000).',
         'prefilter': 'Toggle positive filter of query sequences on or off.'
     },
     output_descriptions=output_descriptions,
     name='ALPHA Hybrid classifier: VSEARCH exact match + sklearn classifier',
-    description=('NOTE: ALPHA RELEASE. Please report bugs to the q2-forum!\n'
+    description=('NOTE: THIS PIPELINE IS AN ALPHA RELEASE. Please report bugs to https://forum.qiime2.org!\n'
                  'Assign taxonomy to query sequences using hybrid classifier. '
                  'First performs rough positive filter to remove artifact and '
                  'low-coverage sequences (use "prefilter" parameter to toggle '

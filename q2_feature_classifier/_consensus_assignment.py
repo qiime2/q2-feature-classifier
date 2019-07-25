@@ -247,5 +247,5 @@ def _compute_consensus_annotation(annotations, min_consensus,
 
 def _annotate_method(taxa, method):
     taxa = taxa.view(pd.DataFrame)
-    taxa['method'] = method
+    taxa['Method'] = method
     return qiime2.Artifact.import_data('FeatureData[Taxonomy]', taxa)
