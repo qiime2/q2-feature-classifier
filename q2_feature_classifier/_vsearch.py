@@ -18,6 +18,7 @@ from ._consensus_assignment import (_consensus_assignments, _run_command,
                                     _get_default_unassignable_label,
                                     _annotate_method)
 from ._taxonomic_classifier import TaxonomicClassifier
+from .classifier import _classify_parameters
 
 
 def classify_consensus_vsearch(query: DNAFASTAFormat,
@@ -198,10 +199,9 @@ plugin.pipelines.register_function(
     function=classify_hybrid_vsearch_sklearn,
     inputs={**inputs, 'classifier': TaxonomicClassifier},
     parameters={**parameters,
-                'reads_per_batch': Int % Range(0, None),
-                'confidence': Float,
-                'read_orientation': Str % Choices(
-                    ['same', 'reverse-complement']),
+                'reads_per_batch': _classify_parameters['reads_per_batch'],
+                'confidence': _classify_parameters['confidence'],
+                'read_orientation': _classify_parameters['read_orientation'],
                 'prefilter': Bool},
     outputs=outputs,
     input_descriptions={**input_descriptions,
@@ -209,22 +209,15 @@ plugin.pipelines.register_function(
                                       'classifier for classifying the reads.'},
     parameter_descriptions={
         **parameter_descriptions,
-        'confidence': 'Confidence threshold for limiting taxonomic depth with '
-                      'sklearn classifier. Provide -1 to disable confidence '
-                      'calculation, or 0 to calculate confidence but not '
-                      'apply it to limit the taxonomic depth of the '
-                      'assignments. Note that confidence scores should be '
-                      'interpreted differently depending on the sklearn '
-                      'classifier that is used for classification. Refer to: '
-                      'https://scikit-learn.org/stable/documentation.html',
+        'confidence': _parameter_descriptions['confidence'],
         'read_orientation': 'Direction of reads with respect to reference '
                             'sequences in pre-trained sklearn classifier. '
                             'same will cause reads to be classified unchanged'
                             '; reverse-complement will cause reads to be '
                             'reversed and complemented prior to '
-                            'classification. Default is to autodetect based '
-                            'on the confidence estimates for the first 100 '
-                            'reads.',
+                            'classification. "auto" will autodetect '
+                            'orientation based on the confidence estimates '
+                            'for the first 100 reads.',
         'reads_per_batch': 'Number of reads to process in each batch for '
                            'sklearn classification. If 0, this parameter is '
                            'autoscaled to min( number of query sequences / '
