@@ -131,7 +131,7 @@ parameters = {'maxaccepts': Int % Range(1, None) | Str % Choices(['all']),
               'strand': Str % Choices(['both', 'plus']),
               'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
                                              inclusive_start=False),
-              'threads': Int}
+              'threads': Int % Range(1, None)}
 
 inputs = {'query': FeatureData[Sequence],
           'reference_reads': FeatureData[Sequence],
