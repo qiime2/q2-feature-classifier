@@ -65,7 +65,7 @@ def classify_hybrid_vsearch_sklearn(ctx,
                                     min_consensus=0.51,
                                     reads_per_batch=0,
                                     confidence=0.7,
-                                    read_orientation=None,
+                                    read_orientation='auto',
                                     threads=1,
                                     prefilter=True):
     exclude = ctx.get_action('quality_control', 'exclude_seqs')
