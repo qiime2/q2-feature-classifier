@@ -145,15 +145,13 @@ parameter_descriptions = {
     'strand': 'Align against reference sequences in forward ("plus") '
               'or both directions ("both").',
     'maxaccepts': 'Maximum number of hits to keep for each query. Set to '
-                  '"all" to keep all hits > perc_identity similarity. Must '
-                  'be in range [0, infinity].',
+                  '"all" to keep all hits > perc_identity similarity.',
     'perc_identity': 'Reject match if percent identity to query is '
-                     'lower. Must be in range [0.0, 1.0].',
+                     'lower.',
     'query_cov': 'Reject match if query alignment coverage per high-'
-                 'scoring pair is lower. Must be in range [0.0, 1.0].',
+                 'scoring pair is lower.',
     'min_consensus': 'Minimum fraction of assignments must match top '
-                     'hit to be accepted as consensus assignment. Must '
-                     'be in range (0.5, 1.0].',
+                     'hit to be accepted as consensus assignment.',
     'threads': 'Number of threads to use for job parallelization.'}
 
 outputs = [('classification', FeatureData[Taxonomy])]
@@ -221,8 +219,8 @@ plugin.pipelines.register_function(
                             'orientation based on the confidence estimates '
                             'for the first 100 reads.',
         'reads_per_batch': 'Number of reads to process in each batch for '
-                           'sklearn classification. If 0, this parameter is '
-                           'autoscaled to min(number of query sequences / '
+                           'sklearn classification. If "auto", this parameter '
+                           'is autoscaled to min(number of query sequences / '
                            'threads, 20000).',
         'prefilter': 'Toggle positive filter of query sequences on or off.'
     },

@@ -244,7 +244,7 @@ _parameter_descriptions = {
                         'and complemented prior to classification. '
                         '"auto" will autodetect orientation based on the '
                         'confidence estimates for the first 100 reads.',
-    'reads_per_batch': 'Number of reads to process in each batch. If 0, '
+    'reads_per_batch': 'Number of reads to process in each batch. If "auto", '
                        'this parameter is autoscaled to '
                        'min( number of query sequences / n_jobs, 20000).',
     'n_jobs': 'The maximum number of concurrently worker processes. If -1 '
