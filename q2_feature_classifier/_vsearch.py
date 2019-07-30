@@ -67,7 +67,9 @@ def classify_hybrid_vsearch_sklearn(ctx,
                                     confidence=0.7,
                                     read_orientation='auto',
                                     threads=1,
-                                    prefilter=True):
+                                    prefilter=True,
+                                    sample_size=1000,
+                                    randseed=0):
     exclude = ctx.get_action('quality_control', 'exclude_seqs')
     ccv = ctx.get_action('feature_classifier', 'classify_consensus_vsearch')
     cs = ctx.get_action('feature_classifier', 'classify_sklearn')
@@ -78,8 +80,9 @@ def classify_hybrid_vsearch_sklearn(ctx,
     if prefilter:
         ref = str(reference_reads.view(DNAFASTAFormat))
         with tempfile.NamedTemporaryFile() as output:
-            cmd = ['vsearch', '--fastx_subsample', ref,
-                   '--sample_size', '100', '--fastaout', output.name]
+            cmd = ['vsearch', '--fastx_subsample', ref, '--sample_size',
+                   str(sample_size), '--randseed', str(randseed),
+                   '--fastaout', output.name]
             _run_command(cmd)
             sparse_reference = qiime2.Artifact.import_data(
                 'FeatureData[Sequence]', output.name)
@@ -156,6 +159,8 @@ parameter_descriptions = {
 
 outputs = [('classification', FeatureData[Taxonomy])]
 
+ignore_prefilter = ' This parameter is ignored if prefilter==False.'
+
 
 plugin.methods.register_function(
     function=classify_consensus_vsearch,
@@ -202,13 +207,24 @@ plugin.pipelines.register_function(
                 'reads_per_batch': _classify_parameters['reads_per_batch'],
                 'confidence': _classify_parameters['confidence'],
                 'read_orientation': _classify_parameters['read_orientation'],
-                'prefilter': Bool},
+                'prefilter': Bool,
+                'sample_size': Int % Range(1, None),
+                'randseed': Int % Range(0, None)},
     outputs=outputs,
     input_descriptions={**input_descriptions,
                         'classifier': 'Pre-trained sklearn taxonomic '
                                       'classifier for classifying the reads.'},
     parameter_descriptions={
-        **parameter_descriptions,
+        **{k: parameter_descriptions[k] for k in [
+            'strand', 'maxaccepts', 'min_consensus', 'threads']},
+        'perc_identity': 'Percent sequence similarity to use for PREFILTER. ' +
+                         parameter_descriptions['perc_identity'] + ' Set to a '
+                         'lower value to perform a rough pre-filter.' +
+                         ignore_prefilter,
+        'query_cov': 'Query coverage threshold to use for PREFILTER. ' +
+                     parameter_descriptions['query_cov'] + ' Set to a '
+                     'lower value to perform a rough pre-filter.' +
+                     ignore_prefilter,
         'confidence': _parameter_descriptions['confidence'],
         'read_orientation': 'Direction of reads with respect to reference '
                             'sequences in pre-trained sklearn classifier. '
@@ -222,7 +238,14 @@ plugin.pipelines.register_function(
                            'sklearn classification. If "auto", this parameter '
                            'is autoscaled to min(number of query sequences / '
                            'threads, 20000).',
-        'prefilter': 'Toggle positive filter of query sequences on or off.'
+        'prefilter': 'Toggle positive filter of query sequences on or off.',
+        'sample_size': 'Randomly extract the given number of sequences from '
+                       'the reference database to use for prefiltering.' +
+                       ignore_prefilter,
+        'randseed': 'Use integer as a seed for the pseudo-random generator '
+                    'used during prefiltering. A given seed always produces '
+                    'the same output, which is useful for replicability. Set '
+                    'to 0 to use a pseudo-random seed.' + ignore_prefilter,
     },
     output_descriptions=output_descriptions,
     name='ALPHA Hybrid classifier: VSEARCH exact match + sklearn classifier',
