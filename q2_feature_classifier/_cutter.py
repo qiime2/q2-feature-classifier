@@ -10,7 +10,7 @@ import skbio
 import os
 from joblib import Parallel, delayed, effective_n_jobs
 
-from qiime2.plugin import Int, Str, Float, Range
+from qiime2.plugin import Int, Str, Float, Range, Choices
 from q2_types.feature_data import (FeatureData, Sequence, DNAIterator,
                                    DNASequencesDirectoryFormat)
 from q2_types.feature_data._format import DNAFASTAFormat
@@ -135,7 +135,7 @@ def extract_reads(sequences: DNASequencesDirectoryFormat,  f_primer: str,
                   r_primer: str, trunc_len: int = 0, trim_left: int = 0,
                   identity: float = 0.8, min_length: int = 50,
                   max_length: int = 0, n_jobs: int = 1,
-                  batch_size: int = 0) -> DNAFASTAFormat:
+                  batch_size: int = 'auto') -> DNAFASTAFormat:
     """Extract the read selected by a primer or primer pair. Only sequences
     which match the primers at greater than the specified identity are returned
 
@@ -169,7 +169,7 @@ def extract_reads(sequences: DNASequencesDirectoryFormat,  f_primer: str,
         containing the reads
     """
     n_jobs = effective_n_jobs(n_jobs)
-    if batch_size == 0:
+    if batch_size == 'auto':
         batch_size = _autotune_reads_per_batch(
             sequences.view(DNAFASTAFormat), n_jobs)
     sequences = sequences.view(DNAIterator)
@@ -202,7 +202,7 @@ plugin.methods.register_function(
                 'min_length': Int % Range(0, None),
                 'max_length': Int % Range(0, None),
                 'n_jobs': Int % Range(1, None),
-                'batch_size': Int % Range(0, None)},
+                'batch_size': Int % Range(1, None) | Str % Choices(['auto'])},
     outputs=[('reads', FeatureData[Sequence])],
     name='Extract reads from reference',
     description='Extract sequencing-like reads from a reference database.',
