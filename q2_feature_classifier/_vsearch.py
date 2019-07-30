@@ -159,7 +159,7 @@ parameter_descriptions = {
 
 outputs = [('classification', FeatureData[Taxonomy])]
 
-ignore_prefilter = ' This parameter is ignored if prefilter==False.'
+ignore_prefilter = ' This parameter is ignored if `prefilter` is disabled.'
 
 
 plugin.methods.register_function(
