@@ -127,7 +127,7 @@ class HybridClassiferTests(FeatureClassifierTestPluginBase):
         result, = feature_classifier.actions.classify_hybrid_vsearch_sklearn(
             query=self.query, reference_reads=self.reads,
             reference_taxonomy=self.taxartifact, classifier=self.classifier,
-            prefilter=True)
+            prefilter=True, read_orientation='same', randseed=1001)
         result = result.view(pd.DataFrame)
         obs = result.Taxon.to_dict()
         exp = {'A': 'k__Bacteria; p__Proteobacteria; c__Gammaproteobacteria; '
