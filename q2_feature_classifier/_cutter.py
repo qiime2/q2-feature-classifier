@@ -131,7 +131,7 @@ def _gen_reads(sequence, f_primer, r_primer, trunc_len, trim_left, identity,
     return amp
 
 
-def extract_reads(sequences: DNASequencesDirectoryFormat,  f_primer: str,
+def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                   r_primer: str, trunc_len: int = 0, trim_left: int = 0,
                   identity: float = 0.8, min_length: int = 50,
                   max_length: int = 0, n_jobs: int = 1,
@@ -165,14 +165,14 @@ def extract_reads(sequences: DNASequencesDirectoryFormat,  f_primer: str,
         Number of samples to be processed in one batch.
     Returns
     -------
-    q2_types.DNAIterator
+    q2_types.DNAFASTAFormat
         containing the reads
     """
     n_jobs = effective_n_jobs(n_jobs)
     if batch_size == 'auto':
         batch_size = _autotune_reads_per_batch(
-            sequences.view(DNAFASTAFormat), n_jobs)
-    sequences = sequences.view(DNAIterator)
+            sequences.file.view(DNAFASTAFormat), n_jobs)
+    sequences = sequences.file.view(DNAIterator)
     ff = DNAFASTAFormat()
     with open(str(ff), 'a') as fh:
         with Parallel(n_jobs) as parallel:

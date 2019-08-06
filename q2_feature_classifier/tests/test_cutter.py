@@ -10,7 +10,8 @@ import os
 import skbio
 
 from qiime2.sdk import Artifact
-from q2_feature_classifier._cutter import extract_reads
+from qiime2.plugins.feature_classifier.actions import extract_reads
+from q2_types.feature_data._format import DNAFASTAFormat
 
 from . import FeatureClassifierTestPluginBase
 
@@ -33,13 +34,28 @@ class CutterTests(FeatureClassifierTestPluginBase):
 
     def _test_results(self, results):
         for i, result in enumerate(
-                skbio.io.read(str(results), format='fasta')):
+                skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
+                              format='fasta')):
             self.assertEqual(str(result), self.amplicons[i])
 
     def test_extract_reads_expected(self):
         results = extract_reads(
             self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
             min_length=4)
+
+        self._test_results(results)
+
+    def test_extract_reads_manual_batch_size(self):
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=4, batch_size=10)
+
+        self._test_results(results)
+
+    def test_extract_reads_two_jobs(self):
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=4, n_jobs=2)
 
         self._test_results(results)
 
