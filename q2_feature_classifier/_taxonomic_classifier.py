@@ -73,8 +73,8 @@ def _1(dirfmt: TaxonomicClassiferTemporaryPickleDirFmt) -> Pipeline:
             pipeline = joblib.load(os.path.join(dirname,
                                                 'sklearn_pipeline.pkl'))
         except MemoryError:
-            raise MemoryError("There is a resource issue regarding your "
-                              "request. To correct this error:\n"
+            raise MemoryError("The operation has run out of available memory. "
+                              "To correct this error:\n"
                               "1. Reduce the reads per batch\n"
                               "2. Reduce number of n_jobs being performed\n"
                               "3. Try using a smaller data set\n"
