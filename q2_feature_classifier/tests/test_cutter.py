@@ -101,4 +101,10 @@ class CutterTests(FeatureClassifierTestPluginBase):
         with self.assertRaisesRegex(RuntimeError, "No matches found"):
             extract_reads(
                 self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
-                trunc_len=1, trim_left=1)
+                trim_left=4)
+
+    def test_extract_reads_fail_min_len_greater_than_trunc_len(self):
+        with self.assertRaisesRegex(ValueError, "minimum length setting"):
+            extract_reads(
+                self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+                trunc_len=1)
