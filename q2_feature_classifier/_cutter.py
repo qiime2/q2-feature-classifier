@@ -169,11 +169,10 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
         containing the reads
     """
     if min_length > trunc_len - trim_left and trunc_len > 0:
-        raise ValueError('Your minimum length is larger than your truncation '
-                         'length minus your trim. This will result in all of '
-                         'your sequences being removed from your dataset. To '
-                         'procees, you must set a minimum length less than '
-                         'your truncation length minus your trim.')
+        raise ValueError('The minimum length setting is greater than the '
+                         'length of the truncated sequences. This will cause '
+                         'all sequences to be removed from the dataset. To '
+                         'proceed, set a min_length ≤ trunc_len - trim_left.')
     n_jobs = effective_n_jobs(n_jobs)
     if batch_size == 'auto':
         batch_size = _autotune_reads_per_batch(
