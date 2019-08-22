@@ -168,10 +168,10 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
     q2_types.DNAFASTAFormat
         containing the reads
     """
-    if min_length > trunc_len and trunc_len > 0:
+    if min_length > trunc_len - trim_left and trunc_len > 0:
         raise ValueError('Your minimum length is larger than your truncation '
-                         'length, this will result in all of your sequences '
-                         'being trimmed automatically.')
+                         'length minus your trim, this will result in all of '
+                         'your sequences being trimmed automatically.')
     n_jobs = effective_n_jobs(n_jobs)
     if batch_size == 'auto':
         batch_size = _autotune_reads_per_batch(
