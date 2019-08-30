@@ -107,6 +107,7 @@ def _gen_reads(sequence, f_primer, r_primer, trunc_len, trim_left, identity,
                min_length, max_length, read_orientation):
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
+    amp = None
     if read_orientation in ['forward', 'both']:
         amp = _exact_match(sequence, f_primer, r_primer)
     if not amp and read_orientation in ['reverse', 'both']:
@@ -166,7 +167,9 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
     batch_size: int, optional
         Number of samples to be processed in one batch.
     read_orientation: str, optional
-        How reads are oriented within the file
+        'Orientation of primers relative to the sequences: "forward" searches '
+        'for primer hits in the forward direction, "reverse" searches the '
+        'reverse-complement, and "both" searches both directions.'
     Returns
     -------
     q2_types.DNAFASTAFormat
@@ -241,8 +244,13 @@ plugin.methods.register_function(
                                           'calculated from the number of '
                                           'sequences and number of jobs '
                                           'specified.',
-                            'read_orientation': "Orientation of reads in "
-                                                "files. 'Both' means there "
-                                                "are forward and reverse "
-                                                "reads in the same file."}
+                            'read_orientation': 'Orientation of primers '
+                                                'relative to the sequences: '
+                                                '"forward" searches for '
+                                                'primer hits in the forward '
+                                                'direction, "reverse" '
+                                                'searches the '
+                                                'reverse-complement, and '
+                                                '"both" searches both '
+                                                'directions.'}
 )

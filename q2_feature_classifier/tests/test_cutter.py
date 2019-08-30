@@ -2,6 +2,7 @@
 # Copyright (c) 2016-2019, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
+
 #
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
@@ -27,21 +28,58 @@ class CutterTests(FeatureClassifierTestPluginBase):
         skbio.io.write((s for s in seqs), 'fasta', tmpseqs)
         self.sequences = Artifact.import_data('FeatureData[Sequence]', tmpseqs)
 
+        seqs = skbio.io.read(self.get_data_path('dna-sequences-mixed.fasta'),
+                             format='fasta', constructor=skbio.DNA)
+        tmpseqs = os.path.join(self.temp_dir.name, 'temp-seqs.fasta')
+        skbio.io.write((s for s in seqs), 'fasta', tmpseqs)
+        self.mixed_sequences = Artifact.import_data(
+                'FeatureData[Sequence]', tmpseqs)
+
         self.f_primer = 'AGAGA'
         self.r_primer = 'GCTGC'
 
-        self.amplicons = ['ACGT', 'AAGT', 'ACCT', 'ACGG', 'ACTT']
+        self.amplicons = {'ACGT', 'AAGT', 'ACCT', 'ACGG', 'ACTT'}
 
     def _test_results(self, results):
-        for i, result in enumerate(
-                skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
-                              format='fasta')):
-            self.assertEqual(str(result), self.amplicons[i])
+        t = set()
+        for result in skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
+                                    format='fasta'):
+            t.add(str(result))
+
+        self.assertEqual(self.amplicons, t)
 
     def test_extract_reads_expected(self):
         results = extract_reads(
             self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
             min_length=4)
+
+        self._test_results(results)
+
+    def test_extract_reads_expected_forward(self):
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=4, read_orientation='forward')
+
+        self._test_results(results)
+
+    def test_extract_mixed(self):
+        results = extract_reads(
+            self.mixed_sequences, f_primer=self.f_primer,
+            r_primer=self.r_primer, min_length=4)
+
+        self._test_results(results)
+
+    def test_extract_reads_expected_reverse(self):
+        seqs = skbio.io.read(self.get_data_path('dna-sequences-reverse.fasta'),
+                             format='fasta', constructor=skbio.DNA)
+        tmpseqs = os.path.join(self.temp_dir.name, 'temp-seqs.fasta')
+        skbio.io.write((s for s in seqs), 'fasta', tmpseqs)
+        reverse_sequences = Artifact.import_data(
+                'FeatureData[Sequence]', tmpseqs)
+
+        results = extract_reads(
+            reverse_sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=4, read_orientation='reverse')
 
         self._test_results(results)
 
