@@ -175,6 +175,11 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
     q2_types.DNAFASTAFormat
         containing the reads
     """
+    if min_length > trunc_len - trim_left and trunc_len > 0:
+        raise ValueError('The minimum length setting is greater than the '
+                         'length of the truncated sequences. This will cause '
+                         'all sequences to be removed from the dataset. To '
+                         'proceed, set a min_length ≤ trunc_len - trim_left.')
     n_jobs = effective_n_jobs(n_jobs)
     if batch_size == 'auto':
         batch_size = _autotune_reads_per_batch(
