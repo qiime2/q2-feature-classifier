@@ -12,7 +12,6 @@ import tempfile
 import tarfile
 import os
 import shutil
-import unittest.mock
 
 import sklearn
 import joblib
@@ -120,16 +119,6 @@ class TestTransformers(TaxonomicClassifierTestBase):
         obs_pipeline = read_pipeline(str(sklearn_pipeline))
         obs = obs_pipeline
         self.assertTrue(obs)
-
-    def test_memory_consumption(self):
-        input = self._custom_setup(sklearn.__version__)
-        transformer = self.get_transformer(
-            TaxonomicClassiferTemporaryPickleDirFmt, Pipeline)
-
-        with unittest.mock.patch('joblib.load', side_effect=MemoryError):
-            with self.assertRaisesRegex(MemoryError,
-                                        "run out of available memory"):
-                transformer(input)
 
 
 if __name__ == "__main__":
