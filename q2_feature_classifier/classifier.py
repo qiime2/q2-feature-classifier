@@ -216,7 +216,17 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
     predictions = predict(reads, classifier, chunk_size=reads_per_batch,
                           n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                           confidence=confidence)
-    seq_ids, taxonomy, confidence = list(zip(*predictions))
+    try:
+        seq_ids, taxonomy, confidence = list(zip(*predictions))
+    except MemoryError:
+        raise MemoryError("The operation has run out of available memory. "
+                          "To correct this error:\n"
+                          "1. Reduce the reads per batch\n"
+                          "2. Reduce number of n_jobs being performed\n"
+                          "3. Try using a smaller data set\n"
+                          "4. Use a more powerful machine or allocate "
+                          "more resources ")
+
     result = pd.DataFrame({'Taxon': taxonomy, 'Confidence': confidence},
                           index=seq_ids, columns=['Taxon', 'Confidence'])
     result.index.name = 'Feature ID'
