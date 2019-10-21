@@ -77,6 +77,23 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
             right += tax[taxon].startswith(res[taxon])
         self.assertGreater(right/len(res), 0.5)
 
+    # make sure weak_id and other parameters do not conflict with each other.
+    # This test just makes sure the command runs okay with all options.
+    # We are not in the business of debugging VSEARCH, but want to have this
+    # test as a canary in the coal mine.
+    def test_vsearch_the_works(self):
+        result = classify_consensus_vsearch(self.reads, self.reads,
+                                            self.taxonomy, top_hits_only=True,
+                                            maxhits=1, maxrejects=10,
+                                            weak_id=0.8, perc_identity=0.99,
+                                            output_no_hits=False)
+        res = result.Taxon.to_dict()
+        tax = self.taxonomy.to_dict()
+        right = 0.
+        for taxon in res:
+            right += tax[taxon].startswith(res[taxon])
+        self.assertGreater(right/len(res), 0.5)
+
 
 class HybridClassiferTests(FeatureClassifierTestPluginBase):
     package = 'q2_feature_classifier.tests'
