@@ -39,10 +39,12 @@ def _extract_reads(reads):
 
 def predict(reads, pipeline, separator=';', chunk_size=262144, n_jobs=1,
             pre_dispatch='2*n_jobs', confidence='disable'):
-    return (m for c in Parallel(n_jobs=n_jobs, batch_size=1,
-                                pre_dispatch=pre_dispatch)
-            (delayed(_predict_chunk)(pipeline, separator, confidence, chunk)
-             for chunk in _chunks(reads, chunk_size)) for m in c)
+    jobs = (
+        delayed(_predict_chunk)(pipeline, separator, confidence, chunk)
+        for chunk in _chunks(reads, chunk_size))
+    workers = Parallel(n_jobs=n_jobs, batch_size=1, pre_dispatch=pre_dispatch)
+    for calculated in workers(jobs):
+        yield from calculated
 
 
 def _predict_chunk(pipeline, separator, confidence, chunk):
