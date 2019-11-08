@@ -203,34 +203,33 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                      pre_dispatch: str = '2*n_jobs', confidence: float = 0.7,
                      read_orientation: str = 'auto'
                      ) -> pd.DataFrame:
-    # autotune reads per batch
-    if reads_per_batch == 0:
-        reads_per_batch = _autotune_reads_per_batch(reads, n_jobs)
-
-    # transform reads to DNAIterator
-    reads = DNAIterator(
-        skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
-
-    reads = _autodetect_orientation(
-        reads, classifier, read_orientation=read_orientation)
-    predictions = predict(reads, classifier, chunk_size=reads_per_batch,
-                          n_jobs=n_jobs, pre_dispatch=pre_dispatch,
-                          confidence=confidence)
     try:
+        # autotune reads per batch
+        if reads_per_batch == 0:
+            reads_per_batch = _autotune_reads_per_batch(reads, n_jobs)
+
+        # transform reads to DNAIterator
+        reads = DNAIterator(
+            skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
+
+        reads = _autodetect_orientation(
+            reads, classifier, read_orientation=read_orientation)
+        predictions = predict(reads, classifier, chunk_size=reads_per_batch,
+                              n_jobs=n_jobs, pre_dispatch=pre_dispatch,
+                              confidence=confidence)
         seq_ids, taxonomy, confidence = list(zip(*predictions))
+
+        result = pd.DataFrame({'Taxon': taxonomy, 'Confidence': confidence},
+                              index=seq_ids, columns=['Taxon', 'Confidence'])
+        result.index.name = 'Feature ID'
+        return result
     except MemoryError:
         raise MemoryError("The operation has run out of available memory. "
                           "To correct this error:\n"
                           "1. Reduce the reads per batch\n"
                           "2. Reduce number of n_jobs being performed\n"
-                          "3. Try using a smaller data set\n"
-                          "4. Use a more powerful machine or allocate "
+                          "3. Use a more powerful machine or allocate "
                           "more resources ")
-
-    result = pd.DataFrame({'Taxon': taxonomy, 'Confidence': confidence},
-                          index=seq_ids, columns=['Taxon', 'Confidence'])
-    result.index.name = 'Feature ID'
-    return result
 
 
 _classify_parameters = {
