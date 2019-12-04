@@ -6,7 +6,6 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-import os
 import skbio
 
 from qiime2.sdk import Artifact
@@ -21,18 +20,13 @@ class CutterTests(FeatureClassifierTestPluginBase):
 
     def setUp(self):
         super().setUp()
-        seqs = skbio.io.read(self.get_data_path('dna-sequences.fasta'),
-                             format='fasta', constructor=skbio.DNA)
-        tmpseqs = os.path.join(self.temp_dir.name, 'temp-seqs.fasta')
-        skbio.io.write((s for s in seqs), 'fasta', tmpseqs)
-        self.sequences = Artifact.import_data('FeatureData[Sequence]', tmpseqs)
+        self.sequences = Artifact.import_data(
+            'FeatureData[Sequence]',
+            self.get_data_path('dna-sequences.fasta'))
 
-        seqs = skbio.io.read(self.get_data_path('dna-sequences-mixed.fasta'),
-                             format='fasta', constructor=skbio.DNA)
-        tmpseqs = os.path.join(self.temp_dir.name, 'temp-seqs.fasta')
-        skbio.io.write((s for s in seqs), 'fasta', tmpseqs)
         self.mixed_sequences = Artifact.import_data(
-                'FeatureData[Sequence]', tmpseqs)
+                'FeatureData[Sequence]',
+                self.get_data_path('dna-sequences-mixed.fasta'))
 
         self.f_primer = 'AGAGA'
         self.r_primer = 'GCTGC'
@@ -69,12 +63,9 @@ class CutterTests(FeatureClassifierTestPluginBase):
         self._test_results(results)
 
     def test_extract_reads_expected_reverse(self):
-        seqs = skbio.io.read(self.get_data_path('dna-sequences-reverse.fasta'),
-                             format='fasta', constructor=skbio.DNA)
-        tmpseqs = os.path.join(self.temp_dir.name, 'temp-seqs.fasta')
-        skbio.io.write((s for s in seqs), 'fasta', tmpseqs)
         reverse_sequences = Artifact.import_data(
-                'FeatureData[Sequence]', tmpseqs)
+            'FeatureData[Sequence]',
+            self.get_data_path('dna-sequences-reverse.fasta'))
 
         results = extract_reads(
             reverse_sequences, f_primer=self.f_primer, r_primer=self.r_primer,
@@ -100,15 +91,9 @@ class CutterTests(FeatureClassifierTestPluginBase):
         degenerate_f_primer = 'WWWWW'
         degenerate_r_primer = 'SSSSS'
 
-        degenerate_seqs = skbio.io.read(
-            self.get_data_path('dna-sequences-degenerate-primers.fasta'),
-            format='fasta', constructor=skbio.DNA)
-        degenerate_tmp_seqs = os.path.join(
-            self.temp_dir.name, 'degenerate-tmp-seqs.fasta')
-        skbio.io.write(
-            (s for s in degenerate_seqs), 'fasta', degenerate_tmp_seqs)
         degenerate_sequences = Artifact.import_data(
-            'FeatureData[Sequence]', degenerate_tmp_seqs)
+            'FeatureData[Sequence]',
+            self.get_data_path('dna-sequences-degenerate-primers.fasta'))
 
         results = extract_reads(
             degenerate_sequences, f_primer=degenerate_f_primer,
@@ -127,6 +112,14 @@ class CutterTests(FeatureClassifierTestPluginBase):
             extract_reads(
                 self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
                 min_length=5)
+
+    def test_extract_reads_fail_max_length(self):
+        with self.assertRaisesRegex(RuntimeError, "No matches found"):
+            extract_reads(
+                self.sequences,
+                f_primer=self.f_primer,
+                r_primer=self.r_primer,
+                max_length=1)
 
     def test_extract_reads_fail_trim_entire_read(self):
         with self.assertRaisesRegex(RuntimeError, "No matches found"):
