@@ -36,7 +36,7 @@ class CutterTests(FeatureClassifierTestPluginBase):
     def _test_results(self, results):
         for i, result in enumerate(
                 skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
-                               format='fasta')):
+                              format='fasta')):
             self.assertEqual(str(result), self.amplicons[i])
 
     def test_extract_reads_expected(self):
