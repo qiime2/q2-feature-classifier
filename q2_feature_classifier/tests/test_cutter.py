@@ -31,15 +31,13 @@ class CutterTests(FeatureClassifierTestPluginBase):
         self.f_primer = 'AGAGA'
         self.r_primer = 'GCTGC'
 
-        self.amplicons = {'ACGT', 'AAGT', 'ACCT', 'ACGG', 'ACTT'}
+        self.amplicons = ['ACGT', 'AAGT', 'ACCT', 'ACGG', 'ACTT']
 
     def _test_results(self, results):
-        t = set()
-        for result in skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
-                                    format='fasta'):
-            t.add(str(result))
-
-        self.assertEqual(self.amplicons, t)
+        for i, result in enumerate(
+                skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
+                               format='fasta')):
+            self.assertEqual(str(result), self.amplicons[i])
 
     def test_extract_reads_expected(self):
         results = extract_reads(
