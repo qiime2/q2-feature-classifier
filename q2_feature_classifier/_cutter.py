@@ -104,15 +104,17 @@ def _approx_match(seq, f_primer, r_primer, identity):
 
 
 def _gen_reads(sequence, f_primer, r_primer, trunc_len, trim_left, identity,
-               min_length, max_length):
+               min_length, max_length, read_orientation):
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
-    amp = _exact_match(sequence, f_primer, r_primer)
-    if not amp:
+    amp = None
+    if read_orientation in ['forward', 'both']:
+        amp = _exact_match(sequence, f_primer, r_primer)
+    if not amp and read_orientation in ['reverse', 'both']:
         amp = _exact_match(sequence.reverse_complement(), f_primer, r_primer)
-    if not amp:
+    if not amp and read_orientation in ['forward', 'both']:
         amp = _approx_match(sequence, f_primer, r_primer, identity)
-    if not amp:
+    if not amp and read_orientation in ['reverse', 'both']:
         amp = _approx_match(
             sequence.reverse_complement(), f_primer, r_primer, identity)
     if not amp:
@@ -135,7 +137,8 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                   r_primer: str, trunc_len: int = 0, trim_left: int = 0,
                   identity: float = 0.8, min_length: int = 50,
                   max_length: int = 0, n_jobs: int = 1,
-                  batch_size: int = 'auto') -> DNAFASTAFormat:
+                  batch_size: int = 'auto', read_orientation: str = 'both') \
+                  -> DNAFASTAFormat:
     """Extract the read selected by a primer or primer pair. Only sequences
     which match the primers at greater than the specified identity are returned
 
@@ -163,6 +166,10 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
         Number of seperate processes to break the task into.
     batch_size: int, optional
         Number of samples to be processed in one batch.
+    read_orientation: str, optional
+        'Orientation of primers relative to the sequences: "forward" searches '
+        'for primer hits in the forward direction, "reverse" searches the '
+        'reverse-complement, and "both" searches both directions.'
     Returns
     -------
     q2_types.DNAFASTAFormat
@@ -186,7 +193,8 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                                                          r_primer, trunc_len,
                                                          trim_left, identity,
                                                          min_length,
-                                                         max_length)
+                                                         max_length,
+                                                         read_orientation)
                                      for sequence in chunk)
                 for amplicon in amplicons:
                     if amplicon is not None:
@@ -207,7 +215,9 @@ plugin.methods.register_function(
                 'min_length': Int % Range(0, None),
                 'max_length': Int % Range(0, None),
                 'n_jobs': Int % Range(1, None),
-                'batch_size': Int % Range(1, None) | Str % Choices(['auto'])},
+                'batch_size': Int % Range(1, None) | Str % Choices(['auto']),
+                'read_orientation': Str % Choices(['both', 'forward',
+                                                   'reverse'])},
     outputs=[('reads', FeatureData[Sequence])],
     name='Extract reads from reference',
     description='Extract sequencing-like reads from a reference database.',
@@ -238,5 +248,14 @@ plugin.methods.register_function(
                                           'a batch. The `auto` option is '
                                           'calculated from the number of '
                                           'sequences and number of jobs '
-                                          'specified.'}
+                                          'specified.',
+                            'read_orientation': 'Orientation of primers '
+                                                'relative to the sequences: '
+                                                '"forward" searches for '
+                                                'primer hits in the forward '
+                                                'direction, "reverse" '
+                                                'searches the '
+                                                'reverse-complement, and '
+                                                '"both" searches both '
+                                                'directions.'}
 )
