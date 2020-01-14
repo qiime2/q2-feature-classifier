@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016-2019, QIIME 2 development team.
+# Copyright (c) 2016-2020, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -8,6 +8,7 @@
 
 import json
 import os
+import unittest.mock
 
 from qiime2.sdk import Artifact
 from q2_types.feature_data import DNAIterator
@@ -242,3 +243,32 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
     def test_autotune_reads_per_batch_more_jobs_than_reads(self):
         self.assertEqual(
             _autotune_reads_per_batch(self.seq_path, n_jobs=1105), 1)
+
+    def test_classify_sklearn(self):
+        '''
+        with self.assertRaisesRegex(
+                                    MemoryError, "run out of available memory"
+                                    ):
+            classify_sklearn(self.seq_path, self.classifier,
+                             reads_per_batch=0, n_jobs=5,
+                             read_orientation='auto')
+                             '''
+        with unittest.mock.patch('list(zip(*predictions))',
+                                 side_effect=MemoryError):
+            self.assertRaisesRegex("run out of available memory")
+
+            '''
+            reads: DNAFASTAFormat, classifier: Pipeline,
+                     reads_per_batch: int = 0, n_jobs: int = 1,
+                     pre_dispatch: str = '2*n_jobs', confidence: float = 0.7,
+                     read_orientation: str = 'auto'
+                     ) -> pd.DataFrame:
+            '''
+    '''
+    def test_classify_sklearn_memory_consumption(self):
+        with unittest.mock.patch('list(zip(*predictions))',
+                                 side_effect=MemoryError):
+            with self.assertRaisesRegex(MemoryError,
+                                        "run out of available memory"):
+                # Do Something
+                '''
