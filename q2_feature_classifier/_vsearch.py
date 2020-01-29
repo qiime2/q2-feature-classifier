@@ -178,7 +178,7 @@ parameter_descriptions = {
                   'sequence passes the acceptation criteria, it is accepted '
                   'as best hit and the search process stops for that query. '
                   'If maxaccepts is set to a higher value, more hits are '
-                  'accepted. If --maxaccepts and --maxrejects are both set to '
+                  'accepted. If maxaccepts and maxrejects are both set to '
                   '"all", the complete database is searched.',
     'perc_identity': 'Reject match if percent identity to query is '
                      'lower.',
