@@ -33,19 +33,31 @@ def classify_consensus_vsearch(query: DNAFASTAFormat,
                                _get_default_unassignable_label(),
                                search_exact: bool = False,
                                top_hits_only: bool = False,
+                               maxhits: int = 'all',
+                               maxrejects: int = 'all',
+                               output_no_hits: bool = True,
+                               weak_id: float = 0.,
                                threads: str = 1) -> pd.DataFrame:
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
     if maxaccepts == 'all':
         maxaccepts = 0
+    if maxrejects == 'all':
+        maxrejects = 0
     cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(perc_identity),
            '--query_cov', str(query_cov), '--strand', strand, '--maxaccepts',
-           str(maxaccepts), '--maxrejects', '0', '--output_no_hits', '--db',
-           ref_fp, '--threads', str(threads)]
+           str(maxaccepts), '--maxrejects', str(maxrejects), '--db', ref_fp,
+           '--threads', str(threads)]
     if search_exact:
         cmd[1] = '--search_exact'
     if top_hits_only:
         cmd.append('--top_hits_only')
+    if output_no_hits:
+        cmd.append('--output_no_hits')
+    if weak_id > 0 and weak_id < perc_identity:
+        cmd.extend(['--weak_id', str(weak_id)])
+    if maxhits != 'all':
+        cmd.extend(['--maxhits', str(maxhits)])
     cmd.append('--blast6out')
     consensus = _consensus_assignments(
         cmd, reference_taxonomy, min_consensus=min_consensus,
@@ -63,6 +75,8 @@ def classify_hybrid_vsearch_sklearn(ctx,
                                     query_cov=0.8,
                                     strand='both',
                                     min_consensus=0.51,
+                                    maxhits='all',
+                                    maxrejects='all',
                                     reads_per_batch=0,
                                     confidence=0.7,
                                     read_orientation='auto',
@@ -97,7 +111,8 @@ def classify_hybrid_vsearch_sklearn(ctx,
     taxa1, = ccv(query=query, reference_reads=reference_reads,
                  reference_taxonomy=reference_taxonomy, maxaccepts=maxaccepts,
                  strand=strand, min_consensus=min_consensus,
-                 search_exact=True, threads=threads)
+                 search_exact=True, threads=threads, maxhits=maxhits,
+                 maxrejects=maxrejects, output_no_hits=True)
 
     # Annotate taxonomic assignments with classification method
     taxa1 = _annotate_method(taxa1, 'VSEARCH')
@@ -134,7 +149,9 @@ parameters = {'maxaccepts': Int % Range(1, None) | Str % Choices(['all']),
               'strand': Str % Choices(['both', 'plus']),
               'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
                                              inclusive_start=False),
-              'threads': Int % Range(1, None)}
+              'threads': Int % Range(1, None),
+              'maxhits': Int % Range(1, None) | Str % Choices(['all']),
+              'maxrejects': Int % Range(1, None) | Str % Choices(['all'])}
 
 inputs = {'query': FeatureData[Sequence],
           'reference_reads': FeatureData[Sequence],
@@ -148,14 +165,33 @@ parameter_descriptions = {
     'strand': 'Align against reference sequences in forward ("plus") '
               'or both directions ("both").',
     'maxaccepts': 'Maximum number of hits to keep for each query. Set to '
-                  '"all" to keep all hits > perc_identity similarity.',
+                  '"all" to keep all hits > perc_identity similarity. Note '
+                  'that if strand=both, maxaccepts will keep N hits for each '
+                  'direction (if searches in the opposite direction yield '
+                  'results that exceed the minimum perc_identity). In those '
+                  'cases use maxhits to control the total number of hits '
+                  'returned. This option works in pair with maxrejects. '
+                  'The search process sorts target sequences by decreasing '
+                  'number of k-mers they have in common with the query '
+                  'sequence, using that information as a proxy for sequence '
+                  'similarity. After pairwise alignments, if the first target '
+                  'sequence passes the acceptation criteria, it is accepted '
+                  'as best hit and the search process stops for that query. '
+                  'If maxaccepts is set to a higher value, more hits are '
+                  'accepted. If maxaccepts and maxrejects are both set to '
+                  '"all", the complete database is searched.',
     'perc_identity': 'Reject match if percent identity to query is '
                      'lower.',
     'query_cov': 'Reject match if query alignment coverage per high-'
                  'scoring pair is lower.',
     'min_consensus': 'Minimum fraction of assignments must match top '
                      'hit to be accepted as consensus assignment.',
-    'threads': 'Number of threads to use for job parallelization.'}
+    'threads': 'Number of threads to use for job parallelization.',
+    'maxhits': 'Maximum number of hits to show once the search is terminated.',
+    'maxrejects': 'Maximum number of non-matching target sequences to '
+                  'consider before stopping the search. This option works in '
+                  'pair with maxaccepts (see maxaccepts description for '
+                  'details).'}
 
 outputs = [('classification', FeatureData[Taxonomy])]
 
@@ -168,7 +204,9 @@ plugin.methods.register_function(
     parameters={**parameters,
                 'unassignable_label': Str,
                 'search_exact': Bool,
-                'top_hits_only': Bool},
+                'top_hits_only': Bool,
+                'output_no_hits': Bool,
+                'weak_id': Float % Range(0.0, 1.0, inclusive_end=True)},
     outputs=outputs,
     input_descriptions=input_descriptions,
     parameter_descriptions={
@@ -186,6 +224,22 @@ plugin.methods.register_function(
                          'identity. Multiple equally scored top hits will be '
                          'used for consensus taxonomic assignment if '
                          'maxaccepts is greater than 1.',
+        'output_no_hits': 'Report both matching and non-matching queries. '
+                          'WARNING: always use the default setting for this '
+                          'option unless if you know what you are doing! If '
+                          'you set this option to False, your sequences and '
+                          'feature table will need to be filtered to exclude '
+                          'unclassified sequences, otherwise you may run into '
+                          'errors downstream from missing feature IDs.',
+        'weak_id': 'Show hits with percentage of identity of at least N, '
+                   'without terminating the search. A normal search stops as '
+                   'soon as enough hits are found (as defined by maxaccepts, '
+                   'maxrejects, and perc_identity). As weak_id reports weak '
+                   'hits that are not deduced from maxaccepts, high '
+                   'perc_identity values can be used, hence preserving both '
+                   'speed and sensitivity. Logically, weak_id must be smaller '
+                   'than the value indicated by perc_identity, otherwise this '
+                   'option will be ignored.',
     },
     output_descriptions=output_descriptions,
     name='VSEARCH-based consensus taxonomy classifier',
