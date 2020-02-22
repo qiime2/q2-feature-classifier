@@ -16,13 +16,14 @@ from ._consensus_assignment import (_consensus_assignments,
 
 # ---------------------------------------------------------------
 # Reason for num_thread not being exposed.
-# BLAST doesn't allow threading when a subject is provided(As of 2/19/20). 
-# num_thread was removed to prevent warning that stated: 
-# "'Num_thread' is currently ignored when 'subject' is specified"(issue #77). 
+# BLAST doesn't allow threading when a subject is provided(As of 2/19/20).
+# num_thread was removed to prevent warning that stated:
+# "'Num_thread' is currently ignored when 'subject' is specified"(issue #77).
 # Seen here: https://github.com/qiime2/q2-feature-classifier/issues/77.
 # A '-subject' input is required in this function.
 # Therefore num_thread is not exposable.
 # ---------------------------------------------------------------
+
 
 def classify_consensus_blast(
         query: DNAFASTAFormat, reference_reads: DNAFASTAFormat,
