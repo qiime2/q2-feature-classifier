@@ -99,6 +99,17 @@ class CutterTests(FeatureClassifierTestPluginBase):
 
         self._test_results(results)
 
+    def test_extract_reads_expected_trim_right(self):
+        """Tests expected behavior of trim_right option"""
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=3, trim_right=1)
+
+        for i, result in enumerate(
+                skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
+                              format='fasta')):
+            self.assertEqual(str(result), self.amplicons[i][:-1])
+
     def test_extract_reads_fail_identity(self):
         with self.assertRaisesRegex(RuntimeError, "No matches found"):
             extract_reads(
