@@ -103,8 +103,8 @@ def _approx_match(seq, f_primer, r_primer, identity):
     return None
 
 
-def _gen_reads(sequence, f_primer, r_primer, trim_left, trim_right, trunc_len, identity,
-               min_length, max_length, read_orientation):
+def _gen_reads(sequence, f_primer, r_primer, trim_left, trim_right, trunc_len,
+               identity, min_length, max_length, read_orientation):
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
     amp = None
@@ -185,7 +185,9 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
         raise ValueError('The minimum length setting is greater than the '
                          'length of the truncated sequences. This will cause '
                          'all sequences to be removed from the dataset. To '
-                         'proceed, set "min_length ≤ trunc_len - (trim_left + trim_right).')
+                         'proceed, set '
+                         '"min_length ≤ trunc_len - (trim_left  + '
+                         'trim_right).')
 
     n_jobs = effective_n_jobs(n_jobs)
     if batch_size == 'auto':
@@ -237,8 +239,8 @@ plugin.methods.register_function(
                                          'from the 5\' end if trim_left is '
                                          'positive. Applied before trim_right.',
                             'trim_right': 'trim_right nucleotides are removed '
-                                         'from the 3\' end if trim_right is '
-                                         'positive. Applied after trim_left.',
+                                          'from the 3\' end if trim_right is '
+                                          'positive. Applied after trim_left.',
                             'trunc_len': 'read is cut to trunc_len if '
                                          'trunc_len is positive. Applied '
                                          'after trim_left and trim_right.',

@@ -25,8 +25,8 @@ class CutterTests(FeatureClassifierTestPluginBase):
             self.get_data_path('dna-sequences.fasta'))
 
         self.mixed_sequences = Artifact.import_data(
-                'FeatureData[Sequence]',
-                self.get_data_path('dna-sequences-mixed.fasta'))
+            'FeatureData[Sequence]',
+            self.get_data_path('dna-sequences-mixed.fasta'))
 
         self.f_primer = 'AGAGA'
         self.r_primer = 'GCTGC'
