@@ -186,7 +186,7 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                          'length of the truncated sequences. This will cause '
                          'all sequences to be removed from the dataset. To '
                          'proceed, set '
-                         '"min_length ≤ trunc_len - (trim_left  + '
+                         'min_length ≤ trunc_len - (trim_left  + '
                          'trim_right).')
 
     n_jobs = effective_n_jobs(n_jobs)
@@ -238,7 +238,7 @@ plugin.methods.register_function(
                             'r_primer': 'reverse primer sequence',
                             'trim_right': 'trim_right nucleotides are removed '
                                           'from the 3\' end if trim_right is '
-                                          'positive. Applied before trunc_len.',
+                                          'positive.Applied before trunc_len.',
                             'trunc_len': 'read is cut to trunc_len if '
                                          'trunc_len is positive. Applied '
                                          'after trim_right.',
