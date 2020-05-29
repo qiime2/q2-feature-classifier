@@ -103,8 +103,8 @@ def _approx_match(seq, f_primer, r_primer, identity):
     return None
 
 
-def _gen_reads(sequence, f_primer, r_primer, trunc_len, trim_left, identity,
-               min_length, max_length, read_orientation):
+def _gen_reads(sequence, f_primer, r_primer, trim_right, trunc_len, trim_left,
+               identity, min_length, max_length, read_orientation):
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
     amp = None
@@ -122,6 +122,8 @@ def _gen_reads(sequence, f_primer, r_primer, trunc_len, trim_left, identity,
     # we want to filter by max length before trimming
     if max_length > 0 and len(amp) > max_length:
         return
+    if trim_right > 0:
+        amp = amp[:-trim_right]
     if trunc_len > 0:
         amp = amp[:trunc_len]
     if trim_left > 0:
@@ -134,7 +136,8 @@ def _gen_reads(sequence, f_primer, r_primer, trunc_len, trim_left, identity,
 
 
 def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
-                  r_primer: str, trunc_len: int = 0, trim_left: int = 0,
+                  r_primer: str, trim_right: int = 0,
+                  trunc_len: int = 0, trim_left: int = 0,
                   identity: float = 0.8, min_length: int = 50,
                   max_length: int = 0, n_jobs: int = 1,
                   batch_size: int = 'auto', read_orientation: str = 'both') \
@@ -150,12 +153,15 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
         Forward primer sequence
     r_primer : skbio.sequence.DNA
         Reverse primer sequence
+    trim_right : int, optional
+        `trim_right` nucleotides are removed from the 3' end if trim_right is
+        positive. Applied before trunc_len.
     trunc_len : int, optional
-        Read is cut to trunc_len if trunc_len is positive. Applied before
-        trim_left.
+        Read is cut to trunc_len if trunc_len is positive. Applied after
+        trim_right.
     trim_left : int, optional
         `trim_left` nucleotides are removed from the 5' end if trim_left is
-        positive. Applied after trunc_len.
+        positive. Applied after trim_right and trunc_len.
     identity : float, optional
         Minimum combined primer match identity threshold. Default: 0.8
     min_length: int, optional
@@ -175,11 +181,14 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
     q2_types.DNAFASTAFormat
         containing the reads
     """
-    if min_length > trunc_len - trim_left and trunc_len > 0:
+    if min_length > trunc_len - (trim_left + trim_right) and trunc_len > 0:
         raise ValueError('The minimum length setting is greater than the '
                          'length of the truncated sequences. This will cause '
                          'all sequences to be removed from the dataset. To '
-                         'proceed, set a min_length ≤ trunc_len - trim_left.')
+                         'proceed, set '
+                         'min_length ≤ trunc_len - (trim_left  + '
+                         'trim_right).')
+
     n_jobs = effective_n_jobs(n_jobs)
     if batch_size == 'auto':
         batch_size = _autotune_reads_per_batch(
@@ -190,8 +199,11 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
         with Parallel(n_jobs) as parallel:
             for chunk in _chunks(sequences, batch_size):
                 amplicons = parallel(delayed(_gen_reads)(sequence, f_primer,
-                                                         r_primer, trunc_len,
-                                                         trim_left, identity,
+                                                         r_primer,
+                                                         trim_right,
+                                                         trunc_len,
+                                                         trim_left,
+                                                         identity,
                                                          min_length,
                                                          max_length,
                                                          read_orientation)
@@ -209,6 +221,7 @@ plugin.methods.register_function(
     inputs={'sequences': FeatureData[Sequence]},
     parameters={'trunc_len': Int,
                 'trim_left': Int,
+                'trim_right': Int,
                 'f_primer': Str,
                 'r_primer': Str,
                 'identity': Float,
@@ -223,12 +236,16 @@ plugin.methods.register_function(
     description='Extract sequencing-like reads from a reference database.',
     parameter_descriptions={'f_primer': 'forward primer sequence',
                             'r_primer': 'reverse primer sequence',
+                            'trim_right': 'trim_right nucleotides are removed '
+                                          'from the 3\' end if trim_right is '
+                                          'positive.Applied before trunc_len.',
                             'trunc_len': 'read is cut to trunc_len if '
                                          'trunc_len is positive. Applied '
-                                         'before trim_left.',
+                                         'after trim_right.',
                             'trim_left': 'trim_left nucleotides are removed '
                                          'from the 5\' end if trim_left is '
-                                         'positive. Applied after trunc_len.',
+                                         'positive. Applied after trim_right '
+                                         'and trunc_len.',
                             'identity': 'minimum combined primer match '
                                         'identity threshold.',
                             'min_length': 'Minimum amplicon length. Shorter '

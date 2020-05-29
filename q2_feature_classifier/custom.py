@@ -96,7 +96,7 @@ class _MultioutputClassifier(BaseEstimator, ClassifierMixin):
         self.separator = separator
 
     def fit(self, X, y, **fit_params):
-        y = list(zip(*[l.split(self.separator) for l in y]))
+        y = list(zip(*[label.split(self.separator) for label in y]))
         self.encoders_ = [LabelEncoder() for _ in y]
         y = [e.fit_transform(l) for e, l in zip(self.encoders_, y)]
         self.base_estimator.fit(X, list(zip(*y)), **fit_params)
@@ -106,12 +106,12 @@ class _MultioutputClassifier(BaseEstimator, ClassifierMixin):
     def classes_(self):
         classes = [e.inverse_transform(l) for e, l in
                    zip(self.encoders_, zip(*self.base_estimator.classes_))]
-        return [self.separator.join(l) for l in zip(*classes)]
+        return [self.separator.join(label) for label in zip(*classes)]
 
     def predict(self, X):
         y = self.base_estimator.predict(X).astype(int)
         y = [e.inverse_transform(l) for e, l in zip(self.encoders_, y.T)]
-        return [self.separator.join(l) for l in zip(*y)]
+        return [self.separator.join(label) for label in zip(*y)]
 
     def predict_proba(self, X):
         return self.base_estimator.predict_proba(X)

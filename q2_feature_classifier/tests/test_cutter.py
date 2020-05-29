@@ -25,8 +25,8 @@ class CutterTests(FeatureClassifierTestPluginBase):
             self.get_data_path('dna-sequences.fasta'))
 
         self.mixed_sequences = Artifact.import_data(
-                'FeatureData[Sequence]',
-                self.get_data_path('dna-sequences-mixed.fasta'))
+            'FeatureData[Sequence]',
+            self.get_data_path('dna-sequences-mixed.fasta'))
 
         self.f_primer = 'AGAGA'
         self.r_primer = 'GCTGC'
@@ -99,6 +99,17 @@ class CutterTests(FeatureClassifierTestPluginBase):
 
         self._test_results(results)
 
+    def test_extract_reads_expected_trim_right(self):
+        """Tests expected behavior of trim_right option"""
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=3, trim_right=1)
+
+        for i, result in enumerate(
+                skbio.io.read(str(results.reads.view(DNAFASTAFormat)),
+                              format='fasta')):
+            self.assertEqual(str(result), self.amplicons[i][:-1])
+
     def test_extract_reads_fail_identity(self):
         with self.assertRaisesRegex(RuntimeError, "No matches found"):
             extract_reads(
@@ -117,11 +128,23 @@ class CutterTests(FeatureClassifierTestPluginBase):
                 self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
                 max_length=1)
 
-    def test_extract_reads_fail_trim_entire_read(self):
+    def test_extract_reads_fail_trim_left_entire_read(self):
         with self.assertRaisesRegex(RuntimeError, "No matches found"):
             extract_reads(
                 self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
                 trim_left=4)
+
+    def test_extract_reads_fail_trim_right_entire_read(self):
+        with self.assertRaisesRegex(RuntimeError, "No matches found"):
+            extract_reads(
+                self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+                trim_right=4)
+
+    def test_extract_reads_fail_trim_both_entire_read(self):
+        with self.assertRaisesRegex(RuntimeError, "No matches found"):
+            extract_reads(
+                self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+                trim_left=2, trim_right=2)
 
     def test_extract_reads_fail_min_len_greater_than_trunc_len(self):
         with self.assertRaisesRegex(ValueError, "minimum length setting"):
