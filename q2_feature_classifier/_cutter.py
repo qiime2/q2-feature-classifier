@@ -272,7 +272,7 @@ plugin.methods.register_function(
                       'number of jobs specified.',
         'read_orientation': 'Orientation of primers relative to the '
                             'sequences: "forward" searches for primer hits in '
-                            'the forward direction, "reverse" searches the '
+                            'the forward direction, "reverse" searches '
                             'reverse-complement, and "both" searches both '
                             'directions.'}
 )
