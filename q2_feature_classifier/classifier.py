@@ -233,7 +233,8 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
 
 
 _classify_parameters = {
-    'reads_per_batch': Int % Range(0, None),
+    'reads_per_batch': Int % Range(0, None, inclusive_start=False) | Str % Choices(
+            ['auto']),
     'n_jobs': Int,
     'pre_dispatch': Str,
     'confidence': Float % Range(
