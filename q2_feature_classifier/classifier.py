@@ -205,7 +205,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                      ) -> pd.DataFrame:
     try:
         # autotune reads per batch
-        if reads_per_batch == 0:
+        if reads_per_batch == 'auto':
             reads_per_batch = _autotune_reads_per_batch(reads, n_jobs)
 
         # transform reads to DNAIterator
