@@ -50,6 +50,12 @@ def classify_consensus_vsearch(query: DNAFASTAFormat,
            '--threads', str(threads)]
     if search_exact:
         cmd[1] = '--search_exact'
+        # Remove options, and their matching argument, which are not compatible
+        # a --search_exact in recent versions of vsearch (such as 2.15.1).
+        for pop_arg in ['--id', '--maxaccepts', '--maxrejects', '--query_cov']:
+            pop_idx = cmd.index(pop_arg)
+            cmd.pop(pop_idx)
+            cmd.pop(pop_idx)
     if top_hits_only:
         cmd.append('--top_hits_only')
     if output_no_hits:
