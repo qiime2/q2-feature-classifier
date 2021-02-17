@@ -51,4 +51,4 @@ jobs:
       with:
         package-name: q2-feature-classifier
         build-target: staging
-        additional-tests: py.test --pyargs q2_feature_classifier --capture=tee-sys
+        additional-tests: py.test --pyargs q2_feature_classifier
