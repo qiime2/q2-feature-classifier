@@ -52,3 +52,4 @@ jobs:
         package-name: q2-feature-classifier
         build-target: staging
         additional-tests: py.test --pyargs q2_feature_classifier
+        library-token: ${{ secrets.LIBRARY_TOKEN }}
