@@ -50,6 +50,6 @@ jobs:
     - uses: qiime2/action-library-packaging@alpha1
       with:
         package-name: q2-feature-classifier
-        build-target: staged
+        build-target: tested
         additional-tests: py.test --pyargs q2_feature_classifier
         library-token: ${{ secrets.LIBRARY_TOKEN }}
