@@ -1,6 +1,5 @@
 {% set data = load_setup_py_data() %}
 {% set version = data.get('version') or 'placehold' %}
-{% set release = '.'.join(version.split('.')[:2]) %}
 
 package:
   name: q2-feature-classifier
@@ -26,14 +25,19 @@ requirements:
     - blast >=2.6.0
     # There are issues with 2.8.2, and no OS X builds exist after 2.7.0
     - vsearch <=2.7.0
-    - qiime2 {{ qiime2 }}
-    - q2-types {{ q2_types }}
-    - q2-quality-control {{ q2_quality_control }}
-    - q2-taxa {{ q2_taxa }}
-    - q2-feature-table {{ q2_feature_table }}
+    - qiime2 {{ qiime2_epoch }}.*
+    - q2-types {{ qiime2_epoch }}.*
+    - q2-quality-control {{ qiime2_epoch }}.*
+    - q2-taxa {{ qiime2_epoch }}.*
+    - q2-feature-table {{ qiime2_epoch }}.*
 
 test:
   requires:
+    - qiime2 >={{ qiime2 }}
+    - q2-types >={{ q2_types }}
+    - q2-quality-control >={{ q2_quality_control }}
+    - q2-taxa >={{ q2_taxa }}
+    - q2-feature-table >={{ q2_feature_table }}
     - pytest
 
   imports:
