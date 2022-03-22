@@ -6,246 +6,219 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-import tempfile
-import subprocess
+from collections import Counter
+from math import ceil
+
 import pandas as pd
-from os.path import isfile
-from collections import Counter, defaultdict
-import qiime2
+
+from qiime2.plugin import Str, Float, Range
+from .plugin_setup import plugin
+from q2_types.feature_data import FeatureData, Taxonomy, BLAST6
 
 
-def _get_default_unassignable_label():
-    return "Unassigned"
+min_consensus_param = {'min_consensus': Float % Range(
+    0.5, 1.0, inclusive_end=True, inclusive_start=False)}
+
+min_consensus_param_description = {
+    'min_consensus': 'Minimum fraction of assignments must match top '
+                     'hit to be accepted as consensus assignment.'}
+
+DEFAULTUNASSIGNABLELABEL = "Unassigned"
 
 
-def _consensus_assignments(
-        cmd, ref_taxa, min_consensus=0.51, output_no_hits=False,
-        exp_seq_ids=None,
-        unassignable_label=_get_default_unassignable_label()):
-    '''Run command line subprocess and find consensus taxonomy.'''
-    with tempfile.NamedTemporaryFile() as output:
-        cmd = cmd + [output.name]
-        _run_command(cmd)
-        obs_taxa = _import_blast_format_assignments(
-            output.name, ref_taxa, unassignable_label=unassignable_label)
-        consensus = _compute_consensus_annotations(
-            obs_taxa, min_consensus=min_consensus,
-            unassignable_label=unassignable_label)
-        # If output_no_hits=True, find/add query IDs missing from consensus
-        if output_no_hits is True:
-            consensus = _output_no_hits(
-                consensus, exp_seq_ids, unassignable_label)
-        # if there are no consensus results (no hits for any query), default
-        # to empty result file (must create empty dict or fail on pd error)
-        if not consensus:
-            consensus = {'': ('', '')}
-        result = pd.DataFrame.from_dict(consensus, 'index')
-        result.index.name = 'Feature ID'
-        result.columns = ['Taxon', 'Consensus']
-        return result
+def find_consensus_annotation(search_results: pd.DataFrame,
+                              reference_taxonomy: pd.Series,
+                              min_consensus: int = 0.51,
+                              unassignable_label: str =
+                              DEFAULTUNASSIGNABLELABEL
+                              ) -> pd.DataFrame:
+    '''Find consensus taxonomy from BLAST6Format alignment summary.
 
-
-def _output_no_hits(obs_taxa, exp_seq_ids,
-                    unassignable_label=_get_default_unassignable_label()):
-    '''If a query ID has no hits, report as unassigned.'''
-    # extract list of query sequence IDs
-    exp = _open_list_or_file(exp_seq_ids)
-    exp = [line.strip('>') for line in exp if line.startswith('>')]
-
-    # iterate over expected IDs, add as unassigned to obs_taxa if missing
-    for _id in exp:
-        if _id not in obs_taxa:
-            obs_taxa[_id] = (unassignable_label, 0.0)
-
-    return obs_taxa
-
-
-# Replace this function with QIIME2 API for wrapping commands/binaries,
-# pending https://github.com/qiime2/qiime2/issues/224
-def _run_command(cmd, verbose=True):
-    if verbose:
-        print("Running external command line application. This may print "
-              "messages to stdout and/or stderr.")
-        print("The command being run is below. This command cannot "
-              "be manually re-run as it will depend on temporary files that "
-              "no longer exist.")
-        print("\nCommand:", end=' ')
-        print(" ".join(cmd), end='\n\n')
-    subprocess.run(cmd, check=True)
-
-
-def _import_blast_format_assignments(
-        assignments, ref_taxa,
-        unassignable_label=_get_default_unassignable_label()):
-    '''import observed assignments in blast6 or blast7 format to dict of lists.
-
-    assignments: path or list
-        Taxonomy observation map in blast format 6 or 7. Each line consists of
-        taxonomy assignments of a query sequence in tab-delimited format:
-            <query_id>    <assignment_id>   <...other columns are ignored>
-
-    ref_taxa: dict or pd.Series
-        Reference taxonomies in tab-delimited format:
-            <accession ID>  kingdom;phylum;class;order;family;genus;species
+    search_results: pd.dataframe
+        BLAST6Format search results with canonical headers attached.
+    reference_taxonomy: pd.Series
+        Annotations of reference database used for original search.
+    min_consensus : float
+        The minimum fraction of the annotations that a specfic annotation
+        must be present in for that annotation to be accepted. Current
+        lower boundary is 0.51.
+    unassignable_label : str
+        The label to apply if no acceptable annotations are identified.
     '''
-    obs_taxa = defaultdict(list)
-    lines = _open_list_or_file(assignments)
-
-    for line in lines:
-        if not line.startswith('#') or line == "":
-            fields = line.split('\t')
-            # if vsearch fails to find assignment, it reports '*' as the
-            # accession ID, which is completely useless and unproductive.
-            if fields[1] == '*':
-                t = [unassignable_label]
-            else:
-                id_ = fields[1]
-
-                try:
-                    t = ref_taxa[id_]
-                except KeyError:
-                    raise KeyError((
-                        'Identifier {0} was reported in taxonomic search '
-                        'results, but was not present in the reference '
-                        'taxonomy.').format(str(id_)))
-
-                try:
-                    t = t.split(';')
-                except ValueError:
-                    raise ValueError((
-                        'Reference taxonomy {0} (id: {1}) is incorrectly '
-                        'formatted.').format(t, str(id_)))
-
-            obs_taxa[fields[0]].append(t)
-
-    return obs_taxa
-
-
-def _open_list_or_file(infile):
-    if isinstance(infile, list):
-        lines = infile
-    elif isfile(infile):
-        with open(infile, "r") as inputfile:
-            lines = [line.strip() for line in inputfile]
-    return lines
-
-
-# This code has been ported and adapted from QIIME 1.9.1 with permission from
-# @gregcaporaso.
-def _compute_consensus_annotations(
-        query_annotations, min_consensus,
-        unassignable_label=_get_default_unassignable_label()):
-    """
-        Parameters
-        ----------
-        query_annotations : dict of lists
-            Keys are query identifiers, and values are lists of all
-            taxonomic annotations associated with that identfier.
-        Returns
-        -------
-        dict
-            Keys are query identifiers, and values are the consensus of the
-            input taxonomic annotations.
-    """
-    result = {}
-    for query_id, annotations in query_annotations.items():
-        consensus_annotation, consensus_fraction = \
-            _compute_consensus_annotation(annotations, min_consensus,
-                                          unassignable_label)
-        result[query_id] = (
-            ';'.join(consensus_annotation), consensus_fraction)
+    # load and convert blast6format results to dict of taxa hits
+    obs_taxa = _blast6format_df_to_series_of_lists(
+        search_results, reference_taxonomy,
+        unassignable_label=unassignable_label)
+    # TODO: is it worth allowing early stopping if maxaccepts==1?
+    # compute consensus annotations
+    result = _compute_consensus_annotations(
+        obs_taxa, min_consensus=min_consensus,
+        unassignable_label=unassignable_label)
+    result.index.name = 'Feature ID'
     return result
 
 
-# This code has been ported from QIIME 1.9.1 with permission from @gregcaporaso
-def _compute_consensus_annotation(annotations, min_consensus,
-                                  unassignable_label):
+plugin.methods.register_function(
+    function=find_consensus_annotation,
+    inputs={'search_results': FeatureData[BLAST6],
+            'reference_taxonomy': FeatureData[Taxonomy]},
+    parameters={
+        **min_consensus_param,
+        'unassignable_label': Str},
+    outputs=[('consensus_taxonomy', FeatureData[Taxonomy])],
+    input_descriptions={
+        'search_results': 'Search results in BLAST6 output format',
+        'reference_taxonomy': 'reference taxonomy labels.'},
+    parameter_descriptions={
+        **min_consensus_param_description,
+        'unassignable_label': 'Annotation given when no consensus is found.'
+    },
+    output_descriptions={
+        'consensus_taxonomy': 'Consensus taxonomy and scores.'},
+    name='Find consensus among multiple annotations.',
+    description=('Find consensus annotation for each query searched against '
+                 'a reference database, by finding the least common ancestor '
+                 'among one or more semicolon-delimited hierarchical '
+                 'annotations. Note that the annotation hierarchy is assumed '
+                 'to have an even number of ranks.'),
+)
+
+
+def _blast6format_df_to_series_of_lists(
+        assignments, ref_taxa,
+        unassignable_label=DEFAULTUNASSIGNABLELABEL):
+    '''import observed assignments in blast6 format to series of lists.
+
+    assignments: pd.DataFrame
+        Taxonomy observation map in blast format 6. Each line consists of
+        taxonomy assignments of a query sequence in tab-delimited format:
+            <query_id>    <subject-seq-id>   <...other columns are ignored>
+
+    ref_taxa: pd.Series
+        Reference taxonomies in tab-delimited format:
+            <accession ID>  Annotation
+        The accession IDs in this taxonomy should match the subject-seq-ids in
+        the "assignment" input.
+    '''
+    taxa_hits = assignments.set_index('qseqid')['sseqid']
+
+    # validate that assignments are present in reference taxonomy
+    # (i.e., that the correct reference taxonomy was used).
+    # Note that we drop unassigned labels from this set.
+    missing_ids = set(taxa_hits.values) - set(ref_taxa.index) - {'*', ''}
+    if len(missing_ids) > 0:
+        raise KeyError('Reference taxonomy and search results do not match. '
+                       'The following identifiers were reported in the search '
+                       'results but are not present in the reference taxonomy:'
+                       ' {0}'.format(', '.join(str(i) for i in missing_ids)))
+
+    # if vsearch fails to find assignment, it reports '*' as the
+    # accession ID, so we will add this mapping to the reference taxonomy.
+    ref_taxa['*'] = unassignable_label
+    # map accession IDs to taxonomy
+    taxa_hits.replace(ref_taxa, inplace=True)
+    # convert to dict of {accession_id: [annotations]}
+    taxa_hits = taxa_hits.groupby(taxa_hits.index).apply(list)
+
+    return taxa_hits
+
+
+def _compute_consensus_annotations(
+        query_annotations, min_consensus,
+        unassignable_label=DEFAULTUNASSIGNABLELABEL):
+    """
+        Parameters
+        ----------
+        query_annotations : pd.Series of lists
+            Indices are query identifiers, and values are lists of all
+            taxonomic annotations associated with that identfier.
+        Returns
+        -------
+        pd.DataFrame
+            Indices are query identifiers, and values are the consensus of the
+            input taxonomic annotations, and the consensus score.
+    """
+    # define function to apply to each list of taxa hits
+    # Note: I am setting this up to open the possibility to define other
+    # functions later (e.g., not simple threshold consensus)
+    def _apply_consensus_function(taxa, min_consensus=min_consensus,
+                                  unassignable_label=unassignable_label,
+                                  _consensus_function=_lca_consensus):
+        # if there is no consensus, skip consensus calculation
+        if len(taxa) == 1:
+            taxa, score = taxa.pop(), 1.
+        else:
+            taxa = _taxa_to_cumulative_ranks(taxa)
+            # apply and score consensus
+            taxa, score = _consensus_function(
+                taxa, min_consensus, unassignable_label)
+        # return as a series so that the outer apply returns a dataframe
+        # (i.e., consensus scores get inserted as an additional column)
+        return pd.Series([taxa, score], index=['Taxon', 'Consensus'])
+
+    # If func returns a Series object the result will be a DataFrame.
+    return query_annotations.apply(_apply_consensus_function)
+
+
+# first split semicolon-delimited taxonomies by rank
+# and iteratively join ranks, so that: ['a;b;c', 'a;b;d', 'a;g;g'] -->
+# [['a', 'a;b', 'a;b;c'], ['a', 'a;b', 'a;b;d'], ['a', 'a;g', 'a;g;g']]
+# this is to avoid issues where e.g., the same species name may occur
+# in different taxonomic lineages.
+def _taxa_to_cumulative_ranks(taxa):
+    """
+        Parameters
+        ----------
+        taxa : list or str
+            List of semicolon-delimited taxonomic labels.
+            e.g., ['a;b;c', 'a;b;d']
+        Returns
+        -------
+        list of lists of str
+            Lists of cumulative taxonomic ranks for each input str
+            e.g., [['a', 'a;b', 'a;b;c'], ['a', 'a;b', 'a;b;d']]
+    """
+    return [[';'.join(t.split(';')[:n + 1])
+             for n in range(t.count(';') + 1)]
+            for t in taxa]
+
+
+# Find the LCA by consensus threshold. Return label and the consensus score.
+def _lca_consensus(annotations, min_consensus, unassignable_label):
     """ Compute the consensus of a collection of annotations
         Parameters
         ----------
         annotations : list of lists
-            Taxonomic annotations to compute the consensus of.
+            Taxonomic annotations to form consensus.
         min_consensus : float
             The minimum fraction of the annotations that a specfic annotation
-            must be present in for that annotation to be accepted. This must
-            be greater than or equal to 0.51.
+            must be present in for that annotation to be accepted. Current
+            lower boundary is 0.51.
         unassignable_label : str
             The label to apply if no acceptable annotations are identified.
         Result
         ------
-        consensus_annotation
-            List containing the consensus assignment
-        consensus_fraction
+        consensus_annotation: str
+            The consensus assignment
+        consensus_fraction: float
             Fraction of input annotations that agreed at the deepest
             level of assignment
     """
-    if min_consensus <= 0.5:
-        raise ValueError("min_consensus must be greater than 0.5.")
-    num_input_annotations = len(annotations)
-    consensus_annotation = []
-
-    # if the annotations don't all have the same number
-    # of levels, the resulting annotation will have a max number
-    # of levels equal to the number of levels in the assignment
-    # with the fewest number of levels. this is to avoid
-    # a case where, for example, there are n assignments, one of
-    # which has 7 levels, and the other n-1 assignments have 6 levels.
-    # A 7th level in the result would be misleading because it
-    # would appear to the user as though it was the consensus
-    # across all n assignments.
-    num_levels = min([len(a) for a in annotations])
-
-    # iterate over the assignment levels
-    for level in range(num_levels):
-        # count the different taxonomic assignments at the current level.
-        # the counts are computed based on the current level and all higher
-        # levels to reflect that, for example, 'p__A; c__B; o__C' and
-        # 'p__X; c__Y; o__C' represent different taxa at the o__ level (since
-        # they are different at the p__ and c__ levels).
-        current_level_annotations = \
-            Counter([tuple(e[:level + 1]) for e in annotations])
-        # identify the most common taxonomic assignment, and compute the
-        # fraction of annotations that contained it. it's safe to compute the
-        # fraction using num_assignments because the deepest level we'll
-        # ever look at here is num_levels (see above comment on how that
-        # is decided).
-        tax, max_count = current_level_annotations.most_common(1)[0]
-        max_consensus_fraction = max_count / num_input_annotations
-        # check whether the most common taxonomic assignment is observed
-        # in at least min_consensus of the sequences
-        if max_consensus_fraction >= min_consensus:
-            # if so, append the current level only (e.g., 'o__C' if tax is
-            # 'p__A; c__B; o__C', and continue on to the next level
-            consensus_annotation.append((tax[-1], max_consensus_fraction))
-        else:
-            # if not, there is no assignment at this level, and we're
-            # done iterating over levels
-            break
-
-    # construct the results
-    # determine the number of levels in the consensus assignment
-    consensus_annotation_depth = len(consensus_annotation)
-    if consensus_annotation_depth > 0:
-        # if it's greater than 0, generate a list of the
-        # taxa assignments at each level
-        annotation = [a[0] for a in consensus_annotation]
-        # and assign the consensus_fraction_result as the
-        # consensus fraction at the deepest level
-        consensus_fraction_result = \
-            consensus_annotation[consensus_annotation_depth - 1][1]
-    else:
-        # if there are zero assignments, indicate that the taxa is
-        # unknown
-        annotation = [unassignable_label]
-        # and assign the consensus_fraction_result to 1.0 (this is
-        # somewhat arbitrary, but could be interpreted as all of the
-        # assignments suggest an unknown taxonomy)
-        consensus_fraction_result = 1.0
-
-    return annotation, consensus_fraction_result
-
-
-def _annotate_method(taxa, method):
-    taxa = taxa.view(pd.DataFrame)
-    taxa['Method'] = method
-    return qiime2.Artifact.import_data('FeatureData[Taxonomy]', taxa)
+    # count total number of labels to get consensus threshold
+    n_annotations = len(annotations)
+    threshold = ceil(n_annotations * min_consensus)
+    # zip together ranks and count frequency of each unique label.
+    # This assumes that a hierarchical taxonomy with even numbers of
+    # ranks was used.
+    taxa_comparison = [Counter(rank) for rank in zip(*annotations)]
+    # interate rank comparisons in reverse
+    # to find rank with consensus count > threshold
+    for rank in taxa_comparison[::-1]:
+        # grab most common label and its count
+        label, count = rank.most_common(1)[0]
+        # TODO: this assumes that min_consensus >= 0.51 (current lower bound)
+        # but could fail to find ties if we allow lower min_consensus scores
+        if count >= threshold:
+            return label, round(count / n_annotations, 3)
+    # if we reach this point, no consensus was ever found at any rank
+    return unassignable_label, 0.0
