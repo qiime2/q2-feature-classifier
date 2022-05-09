@@ -18,7 +18,7 @@ requirements:
 
   run:
     - python {{ python }}
-    - scikit-learn ==0.24.1
+    - scikit-learn {{ scikit_learn }}
     - joblib
     - scikit-bio {{ scikit_bio }}
     - biom-format >=2.1.5,<2.2.0
