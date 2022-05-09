@@ -21,7 +21,7 @@ requirements:
     - scikit-learn {{ scikit_learn }}
     - joblib
     - scikit-bio {{ scikit_bio }}
-    - biom-format >=2.1.5,<2.2.0
+    - biom-format {{ biom_format }}
     - blast >=2.6.0
     # There are issues with 2.8.2, and no OS X builds exist after 2.7.0
     - vsearch <=2.7.0
