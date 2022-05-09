@@ -20,7 +20,7 @@ requirements:
     - python {{ python }}
     - scikit-learn ==0.24.1
     - joblib
-    - scikit-bio
+    - scikit-bio {{ scikit_bio }}
     - biom-format >=2.1.5,<2.2.0
     - blast >=2.6.0
     # There are issues with 2.8.2, and no OS X builds exist after 2.7.0
