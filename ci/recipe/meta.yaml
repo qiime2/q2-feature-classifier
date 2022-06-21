@@ -23,8 +23,7 @@ requirements:
     - scikit-bio {{ scikit_bio }}
     - biom-format {{ biom_format }}
     - blast >=2.6.0
-    # There are issues with 2.8.2, and no OS X builds exist after 2.7.0
-    - vsearch <=2.7.0
+    - vsearch
     - qiime2 {{ qiime2_epoch }}.*
     - q2-types {{ qiime2_epoch }}.*
     - q2-quality-control {{ qiime2_epoch }}.*
