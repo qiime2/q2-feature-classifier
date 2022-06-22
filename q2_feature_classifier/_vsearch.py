@@ -44,12 +44,28 @@ def classify_consensus_vsearch(query: DNAFASTAFormat,
         maxaccepts = 0
     if maxrejects == 'all':
         maxrejects = 0
-    cmd = ['vsearch', '--usearch_global', seqs_fp, '--id', str(perc_identity),
-           '--query_cov', str(query_cov), '--strand', strand, '--maxaccepts',
-           str(maxaccepts), '--maxrejects', str(maxrejects), '--db', ref_fp,
-           '--threads', str(threads)]
+
     if search_exact:
-        cmd[1] = '--search_exact'
+        cmd = [
+            'vsearch',
+            '--search_exact', seqs_fp,
+            '--strand', strand,
+            '--db', ref_fp,
+            '--threads', str(threads),
+        ]
+    else:
+        cmd = [
+            'vsearch',
+            '--usearch_global', seqs_fp,
+            '--id', str(perc_identity),
+            '--query_cov', str(query_cov),
+            '--strand', strand,
+            '--maxaccepts', str(maxaccepts),
+            '--maxrejects', str(maxrejects),
+            '--db', ref_fp,
+            '--threads', str(threads),
+        ]
+
     if top_hits_only:
         cmd.append('--top_hits_only')
     if output_no_hits:
