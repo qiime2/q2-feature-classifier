@@ -58,8 +58,11 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
         self.assertGreater(right/len(res), 0.5)
 
     def test_vsearch_search_exact(self):
-        result = classify_consensus_vsearch(self.reads, self.reads,
-                                            self.taxonomy, search_exact=True)
+        # search_exact with all other exposed params to confirm compatibility
+        # in future releases of vsearch
+        result = classify_consensus_vsearch(
+            self.reads, self.reads, self.taxonomy, search_exact=True,
+            top_hits_only=True, output_no_hits=True, weak_id=0.9, maxhits=10)
         res = result.Taxon.to_dict()
         tax = self.taxonomy.to_dict()
         right = 0.
