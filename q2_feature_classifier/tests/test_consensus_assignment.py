@@ -111,6 +111,26 @@ class SequenceSearchTests(FeatureClassifierTestPluginBase):
         pdt.assert_frame_equal(
             result.view(pd.DataFrame), exp, check_names=False)
 
+    def test_vsearch_global_permissive(self):
+        result, = qfc.actions.vsearch_global(
+            self.query, self.ref, maxaccepts=1, perc_identity=0.8,
+            query_cov=0.2)
+        exp = pd.DataFrame({
+            'qseqid': {0: '1111561', 1: '835097', 2: 'junk'},
+            'sseqid': {0: '1111561', 1: '835097', 2: '4314518'},
+            'pident': {0: 100.0, 1: 100.0, 2: 90.0},
+            'length': {0: 75.0, 1: 80.0, 2: 20.0},
+            'mismatch': {0: 0.0, 1: 0.0, 2: 2.0},
+            'gapopen': {0: 0.0, 1: 0.0, 2: 0.0},
+            'qstart': {0: 1.0, 1: 1.0, 2: 1.0},
+            'qend': {0: 75.0, 1: 80.0, 2: 100.0},
+            'sstart': {0: 1.0, 1: 1.0, 2: 1.0},
+            'send': {0: 150.0, 1: 150.0, 2: 95.0},
+            'evalue': {0: -1.0, 1: -1.0, 2: -1.0},
+            'bitscore': {0: 0.0, 1: 0.0, 2: 0.0}})
+        pdt.assert_frame_equal(
+            result.view(pd.DataFrame), exp, check_names=False)
+
 
 # setting up utility test for comparing series below
 def series_is_subset(expected, observed):
