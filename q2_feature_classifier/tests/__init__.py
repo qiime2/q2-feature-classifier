@@ -14,6 +14,8 @@ from qiime2.plugin.testing import TestPluginBase
 
 
 class FeatureClassifierTestPluginBase(TestPluginBase):
+    package = 'q2_feature_classifier.tests'
+
     def setUp(self):
         try:
             from q2_feature_classifier.plugin_setup import plugin

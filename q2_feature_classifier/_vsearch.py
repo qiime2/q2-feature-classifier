@@ -7,37 +7,48 @@
 # ----------------------------------------------------------------------------
 
 import tempfile
-import pandas as pd
 import qiime2
+import pandas as pd
 
 from q2_types.feature_data import (
-    FeatureData, Taxonomy, Sequence, DNAFASTAFormat)
+    FeatureData, Taxonomy, Sequence, DNAFASTAFormat, BLAST6, BLAST6Format)
 from .plugin_setup import plugin, citations
 from qiime2.plugin import Int, Str, Float, Choices, Range, Bool
-from ._consensus_assignment import (_consensus_assignments, _run_command,
-                                    _get_default_unassignable_label,
-                                    _annotate_method)
+from ._blast import (_run_command)
+from ._consensus_assignment import (DEFAULTUNASSIGNABLELABEL,
+                                    min_consensus_param,
+                                    min_consensus_param_description)
 from ._taxonomic_classifier import TaxonomicClassifier
 from .classifier import _classify_parameters, _parameter_descriptions
 
+# Specify default settings for various functions
+DEFAULTMAXACCEPTS = 10
+DEFAULTPERCENTID = 0.8
+DEFAULTQUERYCOV = 0.8
+DEFAULTSTRAND = 'both'
+DEFAULTSEARCHEXACT = False
+DEFAULTTOPHITS = False
+DEFAULTMAXHITS = 'all'
+DEFAULTMAXREJECTS = 'all'
+DEFAULTOUTPUTNOHITS = True
+DEFAULTWEAKID = 0.
+DEFAULTTHREADS = 1
+DEFAULTMINCONSENSUS = 0.51
 
-def classify_consensus_vsearch(query: DNAFASTAFormat,
-                               reference_reads: DNAFASTAFormat,
-                               reference_taxonomy: pd.Series,
-                               maxaccepts: int = 10,
-                               perc_identity: float = 0.8,
-                               query_cov: float = 0.8,
-                               strand: str = 'both',
-                               min_consensus: float = 0.51,
-                               unassignable_label: str =
-                               _get_default_unassignable_label(),
-                               search_exact: bool = False,
-                               top_hits_only: bool = False,
-                               maxhits: int = 'all',
-                               maxrejects: int = 'all',
-                               output_no_hits: bool = True,
-                               weak_id: float = 0.,
-                               threads: str = 1) -> pd.DataFrame:
+
+def vsearch_global(query: DNAFASTAFormat,
+                   reference_reads: DNAFASTAFormat,
+                   maxaccepts: int = DEFAULTMAXACCEPTS,
+                   perc_identity: float = DEFAULTPERCENTID,
+                   query_cov: float = DEFAULTQUERYCOV,
+                   strand: str = DEFAULTSTRAND,
+                   search_exact: bool = DEFAULTSEARCHEXACT,
+                   top_hits_only: bool = DEFAULTTOPHITS,
+                   maxhits: int = DEFAULTMAXHITS,
+                   maxrejects: int = DEFAULTMAXREJECTS,
+                   output_no_hits: bool = DEFAULTOUTPUTNOHITS,
+                   weak_id: float = DEFAULTWEAKID,
+                   threads: str = DEFAULTTHREADS) -> BLAST6Format:
     seqs_fp = str(query)
     ref_fp = str(reference_reads)
     if maxaccepts == 'all':
@@ -74,11 +85,52 @@ def classify_consensus_vsearch(query: DNAFASTAFormat,
         cmd.extend(['--weak_id', str(weak_id)])
     if maxhits != 'all':
         cmd.extend(['--maxhits', str(maxhits)])
-    cmd.append('--blast6out')
-    consensus = _consensus_assignments(
-        cmd, reference_taxonomy, min_consensus=min_consensus,
-        unassignable_label=unassignable_label)
-    return consensus
+    output = BLAST6Format()
+    cmd.extend(['--blast6out', str(output)])
+    _run_command(cmd)
+    return output
+
+
+def classify_consensus_vsearch(ctx,
+                               query,
+                               reference_reads,
+                               reference_taxonomy,
+                               maxaccepts=DEFAULTMAXACCEPTS,
+                               perc_identity=DEFAULTPERCENTID,
+                               query_cov=DEFAULTQUERYCOV,
+                               strand=DEFAULTSTRAND,
+                               search_exact=DEFAULTSEARCHEXACT,
+                               top_hits_only=DEFAULTTOPHITS,
+                               maxhits=DEFAULTMAXHITS,
+                               maxrejects=DEFAULTMAXREJECTS,
+                               output_no_hits=DEFAULTOUTPUTNOHITS,
+                               weak_id=DEFAULTWEAKID,
+                               threads=DEFAULTTHREADS,
+                               min_consensus=DEFAULTMINCONSENSUS,
+                               unassignable_label=DEFAULTUNASSIGNABLELABEL):
+    search_db = ctx.get_action('feature_classifier', 'vsearch_global')
+    lca = ctx.get_action('feature_classifier', 'find_consensus_annotation')
+    result, = search_db(query=query, reference_reads=reference_reads,
+                        maxaccepts=maxaccepts, perc_identity=perc_identity,
+                        query_cov=query_cov, strand=strand,
+                        search_exact=search_exact, top_hits_only=top_hits_only,
+                        maxhits=maxhits, maxrejects=maxrejects,
+                        output_no_hits=output_no_hits, weak_id=weak_id,
+                        threads=threads)
+    consensus, = lca(search_results=result,
+                     reference_taxonomy=reference_taxonomy,
+                     min_consensus=min_consensus,
+                     unassignable_label=unassignable_label)
+    # New: add BLAST6Format result as an output. This could just as well be a
+    # visualizer generated from these results (using q2-metadata tabulate).
+    # Would that be more useful to the user that the QZA?
+    return consensus, result
+
+
+def _annotate_method(taxa, method):
+    taxa = taxa.view(pd.DataFrame)
+    taxa['Method'] = method
+    return qiime2.Artifact.import_data('FeatureData[Taxonomy]', taxa)
 
 
 def classify_hybrid_vsearch_sklearn(ctx,
@@ -86,17 +138,17 @@ def classify_hybrid_vsearch_sklearn(ctx,
                                     reference_reads,
                                     reference_taxonomy,
                                     classifier,
-                                    maxaccepts=10,
+                                    maxaccepts=DEFAULTMAXACCEPTS,
                                     perc_identity=0.5,
-                                    query_cov=0.8,
-                                    strand='both',
-                                    min_consensus=0.51,
-                                    maxhits='all',
-                                    maxrejects='all',
+                                    query_cov=DEFAULTQUERYCOV,
+                                    strand=DEFAULTSTRAND,
+                                    min_consensus=DEFAULTMINCONSENSUS,
+                                    maxhits=DEFAULTMAXHITS,
+                                    maxrejects=DEFAULTMAXREJECTS,
                                     reads_per_batch='auto',
                                     confidence=0.7,
                                     read_orientation='auto',
-                                    threads=1,
+                                    threads=DEFAULTTHREADS,
                                     prefilter=True,
                                     sample_size=1000,
                                     randseed=0):
@@ -124,11 +176,13 @@ def classify_hybrid_vsearch_sklearn(ctx,
                 perc_query_aligned=query_cov, threads=threads)
 
     # find exact matches, perform LCA consensus classification
-    taxa1, = ccv(query=query, reference_reads=reference_reads,
-                 reference_taxonomy=reference_taxonomy, maxaccepts=maxaccepts,
-                 strand=strand, min_consensus=min_consensus,
-                 search_exact=True, threads=threads, maxhits=maxhits,
-                 maxrejects=maxrejects, output_no_hits=True)
+    # note: we only keep the taxonomic assignments, not the search report
+    taxa1, _, = ccv(
+        query=query, reference_reads=reference_reads,
+        reference_taxonomy=reference_taxonomy, maxaccepts=maxaccepts,
+        strand=strand, min_consensus=min_consensus, search_exact=True,
+        threads=threads, maxhits=maxhits, maxrejects=maxrejects,
+        output_no_hits=True)
 
     # Annotate taxonomic assignments with classification method
     taxa1 = _annotate_method(taxa1, 'VSEARCH')
@@ -137,7 +191,7 @@ def classify_hybrid_vsearch_sklearn(ctx,
     # filter out unassigned seqs
     try:
         query, = filter_seqs(sequences=query, taxonomy=taxa1,
-                             include=_get_default_unassignable_label())
+                             include=DEFAULTUNASSIGNABLELABEL)
     except ValueError:
         # get ValueError if all sequences are filtered out.
         # so if no sequences are unassigned, return exact match results
@@ -156,26 +210,24 @@ def classify_hybrid_vsearch_sklearn(ctx,
     return taxa
 
 
-output_descriptions = {
-    'classification': 'The resulting taxonomy classifications.'}
-
 parameters = {'maxaccepts': Int % Range(1, None) | Str % Choices(['all']),
               'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
               'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
               'strand': Str % Choices(['both', 'plus']),
-              'min_consensus': Float % Range(0.5, 1.0, inclusive_end=True,
-                                             inclusive_start=False),
               'threads': Int % Range(1, None),
               'maxhits': Int % Range(1, None) | Str % Choices(['all']),
               'maxrejects': Int % Range(1, None) | Str % Choices(['all'])}
 
-inputs = {'query': FeatureData[Sequence],
-          'reference_reads': FeatureData[Sequence],
-          'reference_taxonomy': FeatureData[Taxonomy]}
+extra_params = {'search_exact': Bool,
+                'top_hits_only': Bool,
+                'output_no_hits': Bool,
+                'weak_id': Float % Range(0.0, 1.0, inclusive_end=True)}
 
-input_descriptions = {'query': 'Sequences to classify taxonomically.',
-                      'reference_reads': 'reference sequences.',
-                      'reference_taxonomy': 'reference taxonomy labels.'}
+inputs = {'query': FeatureData[Sequence],
+          'reference_reads': FeatureData[Sequence]}
+
+input_descriptions = {'query': 'Query Sequences.',
+                      'reference_reads': 'Reference sequences.'}
 
 parameter_descriptions = {
     'strand': 'Align against reference sequences in forward ("plus") '
@@ -200,8 +252,6 @@ parameter_descriptions = {
                      'lower.',
     'query_cov': 'Reject match if query alignment coverage per high-'
                  'scoring pair is lower.',
-    'min_consensus': 'Minimum fraction of assignments must match top '
-                     'hit to be accepted as consensus assignment.',
     'threads': 'Number of threads to use for job parallelization.',
     'maxhits': 'Maximum number of hits to show once the search is terminated.',
     'maxrejects': 'Maximum number of non-matching target sequences to '
@@ -209,55 +259,91 @@ parameter_descriptions = {
                   'pair with maxaccepts (see maxaccepts description for '
                   'details).'}
 
-outputs = [('classification', FeatureData[Taxonomy])]
+extra_param_descriptions = {
+    'search_exact': 'Search for exact full-length matches to the query '
+                    'sequences. Only 100% exact matches are reported and '
+                    'this command is much faster than the default. If '
+                    'True, the perc_identity and query_cov settings are '
+                    'ignored. Note: query and reference reads must be '
+                    'trimmed to the exact same DNA locus (e.g., primer '
+                    'site) because only exact matches will be reported.',
+    'top_hits_only': 'Only the top hits between the query and reference '
+                     'sequence sets are reported. For each query, the top '
+                     'hit is the one presenting the highest percentage of '
+                     'identity. Multiple equally scored top hits will be '
+                     'used for consensus taxonomic assignment if '
+                     'maxaccepts is greater than 1.',
+    'output_no_hits': 'Report both matching and non-matching queries. '
+                      'WARNING: always use the default setting for this '
+                      'option unless if you know what you are doing! If '
+                      'you set this option to False, your sequences and '
+                      'feature table will need to be filtered to exclude '
+                      'unclassified sequences, otherwise you may run into '
+                      'errors downstream from missing feature IDs.',
+    'weak_id': 'Show hits with percentage of identity of at least N, '
+               'without terminating the search. A normal search stops as '
+               'soon as enough hits are found (as defined by maxaccepts, '
+               'maxrejects, and perc_identity). As weak_id reports weak '
+               'hits that are not deduced from maxaccepts, high '
+               'perc_identity values can be used, hence preserving both '
+               'speed and sensitivity. Logically, weak_id must be smaller '
+               'than the value indicated by perc_identity, otherwise this '
+               'option will be ignored.',
+}
+
+classification_output = ('classification', FeatureData[Taxonomy])
+
+classification_output_description = {
+    'classification': 'Taxonomy classifications of query sequences.'}
+
+blast6_output = ('search_results', FeatureData[BLAST6])
+
+blast6_output_description = {'search_results': 'Top hits for each query.'}
 
 ignore_prefilter = ' This parameter is ignored if `prefilter` is disabled.'
 
 
 plugin.methods.register_function(
-    function=classify_consensus_vsearch,
+    function=vsearch_global,
     inputs=inputs,
     parameters={**parameters,
-                'unassignable_label': Str,
-                'search_exact': Bool,
-                'top_hits_only': Bool,
-                'output_no_hits': Bool,
-                'weak_id': Float % Range(0.0, 1.0, inclusive_end=True)},
-    outputs=outputs,
+                **extra_params},
+    outputs=[blast6_output],
     input_descriptions=input_descriptions,
     parameter_descriptions={
         **parameter_descriptions,
-        'search_exact': 'Search for exact full-length matches to the query '
-                        'sequences. Only 100% exact matches are reported and '
-                        'this command is much faster than the default. If '
-                        'True, the perc_identity and query_cov settings are '
-                        'ignored. Note: query and reference reads must be '
-                        'trimmed to the exact same DNA locus (e.g., primer '
-                        'site) because only exact matches will be reported.',
-        'top_hits_only': 'Only the top hits between the query and reference '
-                         'sequence sets are reported. For each query, the top '
-                         'hit is the one presenting the highest percentage of '
-                         'identity. Multiple equally scored top hits will be '
-                         'used for consensus taxonomic assignment if '
-                         'maxaccepts is greater than 1.',
-        'output_no_hits': 'Report both matching and non-matching queries. '
-                          'WARNING: always use the default setting for this '
-                          'option unless if you know what you are doing! If '
-                          'you set this option to False, your sequences and '
-                          'feature table will need to be filtered to exclude '
-                          'unclassified sequences, otherwise you may run into '
-                          'errors downstream from missing feature IDs.',
-        'weak_id': 'Show hits with percentage of identity of at least N, '
-                   'without terminating the search. A normal search stops as '
-                   'soon as enough hits are found (as defined by maxaccepts, '
-                   'maxrejects, and perc_identity). As weak_id reports weak '
-                   'hits that are not deduced from maxaccepts, high '
-                   'perc_identity values can be used, hence preserving both '
-                   'speed and sensitivity. Logically, weak_id must be smaller '
-                   'than the value indicated by perc_identity, otherwise this '
-                   'option will be ignored.',
+        **extra_param_descriptions,
     },
-    output_descriptions=output_descriptions,
+    output_descriptions=blast6_output_description,
+    name='VSEARCH global alignment search',
+    description=('Search for top hits in a reference database via global '
+                 'alignment between the query sequences and reference '
+                 'database sequences using VSEARCH. Returns a report of the '
+                 'top M hits for each query (where M=maxaccepts or maxhits).'),
+    citations=[citations['rognes2016vsearch']]
+)
+
+
+plugin.pipelines.register_function(
+    function=classify_consensus_vsearch,
+    inputs={**inputs,
+            'reference_taxonomy': FeatureData[Taxonomy]},
+    parameters={**parameters,
+                **extra_params,
+                **min_consensus_param,
+                'unassignable_label': Str,
+                },
+    outputs=[classification_output, blast6_output],
+    input_descriptions={**input_descriptions,
+                        'reference_taxonomy': 'Reference taxonomy labels.'},
+    parameter_descriptions={
+        **parameter_descriptions,
+        **extra_param_descriptions,
+        **min_consensus_param_description,
+        'unassignable_label': 'Annotation given to sequences without any hits.'
+    },
+    output_descriptions={**classification_output_description,
+                         **blast6_output_description},
     name='VSEARCH-based consensus taxonomy classifier',
     description=('Assign taxonomy to query sequences using VSEARCH. Performs '
                  'VSEARCH global alignment between query and reference_reads, '
@@ -272,21 +358,26 @@ plugin.methods.register_function(
 
 plugin.pipelines.register_function(
     function=classify_hybrid_vsearch_sklearn,
-    inputs={**inputs, 'classifier': TaxonomicClassifier},
+    inputs={**inputs,
+            'reference_taxonomy': FeatureData[Taxonomy],
+            'classifier': TaxonomicClassifier},
     parameters={**parameters,
+                **min_consensus_param,
                 'reads_per_batch': _classify_parameters['reads_per_batch'],
                 'confidence': _classify_parameters['confidence'],
                 'read_orientation': _classify_parameters['read_orientation'],
                 'prefilter': Bool,
                 'sample_size': Int % Range(1, None),
                 'randseed': Int % Range(0, None)},
-    outputs=outputs,
+    outputs=[classification_output],
     input_descriptions={**input_descriptions,
+                        'reference_taxonomy': 'Reference taxonomy labels.',
                         'classifier': 'Pre-trained sklearn taxonomic '
                                       'classifier for classifying the reads.'},
     parameter_descriptions={
         **{k: parameter_descriptions[k] for k in [
-            'strand', 'maxaccepts', 'min_consensus', 'threads']},
+            'strand', 'maxaccepts', 'threads']},
+        **min_consensus_param_description,
         'perc_identity': 'Percent sequence similarity to use for PREFILTER. ' +
                          parameter_descriptions['perc_identity'] + ' Set to a '
                          'lower value to perform a rough pre-filter.' +
@@ -317,7 +408,7 @@ plugin.pipelines.register_function(
                     'the same output, which is useful for replicability. Set '
                     'to 0 to use a pseudo-random seed.' + ignore_prefilter,
     },
-    output_descriptions=output_descriptions,
+    output_descriptions=classification_output_description,
     name='ALPHA Hybrid classifier: VSEARCH exact match + sklearn classifier',
     description=('NOTE: THIS PIPELINE IS AN ALPHA RELEASE. Please report bugs '
                  'to https://forum.qiime2.org!\n'
