@@ -172,9 +172,12 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
             self.reads, self.reads, self.taxonomy)
         self.assertTrue(series_is_subset(self.exp, result.view(pd.Series)))
 
+    # search_exact with all other exposed params to confirm compatibility
+    # in future releases of vsearch
     def test_classify_consensus_vsearch_search_exact(self):
         result, _, = qfc.actions.classify_consensus_vsearch(
-            self.reads, self.reads, self.taxonomy, search_exact=True)
+            self.reads, self.reads, self.taxonomy, search_exact=True,
+            top_hits_only=True, output_no_hits=True, weak_id=0.9, maxhits=10)
         self.assertTrue(series_is_subset(self.exp, result.view(pd.Series)))
 
     def test_classify_consensus_vsearch_top_hits_only(self):

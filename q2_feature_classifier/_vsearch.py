@@ -261,12 +261,13 @@ parameter_descriptions = {
 
 extra_param_descriptions = {
     'search_exact': 'Search for exact full-length matches to the query '
-                    'sequences. Only 100% exact matches are reported and '
-                    'this command is much faster than the default. If '
-                    'True, the perc_identity and query_cov settings are '
-                    'ignored. Note: query and reference reads must be '
-                    'trimmed to the exact same DNA locus (e.g., primer '
-                    'site) because only exact matches will be reported.',
+                    'sequences. Only 100% exact matches are reported and this '
+                    'command is much faster than the default. If True, the '
+                    'perc_identity, query_cov, maxaccepts, and maxrejects '
+                    'settings are ignored. Note: query and reference reads '
+                    'must be trimmed to the exact same DNA locus (e.g., '
+                    'primer site) because only exact matches will be '
+                    'reported.',
     'top_hits_only': 'Only the top hits between the query and reference '
                      'sequence sets are reported. For each query, the top '
                      'hit is the one presenting the highest percentage of '
