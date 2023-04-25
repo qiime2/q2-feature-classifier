@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2016-2023, QIIME 2 development team.
+# Copyright (c) 2016-2022, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -100,12 +100,10 @@ def _blast6format_df_to_series_of_lists(
         The accession IDs in this taxonomy should match the subject-seq-ids in
         the "assignment" input.
     '''
-    taxa_hits = assignments.set_index('qseqid')['sseqid']
-
     # validate that assignments are present in reference taxonomy
     # (i.e., that the correct reference taxonomy was used).
     # Note that we drop unassigned labels from this set.
-    missing_ids = set(taxa_hits.values) - set(ref_taxa.index) - {'*', ''}
+    missing_ids = set(assignments['sseqid'].values) - set(ref_taxa.index) - {'*', ''}
     if len(missing_ids) > 0:
         raise KeyError('Reference taxonomy and search results do not match. '
                        'The following identifiers were reported in the search '
@@ -116,8 +114,13 @@ def _blast6format_df_to_series_of_lists(
     # accession ID, so we will add this mapping to the reference taxonomy.
     ref_taxa['*'] = unassignable_label
     # map accession IDs to taxonomy
-    taxa_hits.replace(ref_taxa, inplace=True)
+    for index, value in assignments.iterrows():
+        sseqid = assignments.iloc[index]['sseqid']
+        assignments.at[index, 'sseqid'] = ref_taxa.at[sseqid]
+    # Command used before:
+    #  taxa_hits.replace(ref_taxa, inplace=True)
     # convert to dict of {accession_id: [annotations]}
+    taxa_hits: pd.Series = assignments.set_index('qseqid')['sseqid']
     taxa_hits = taxa_hits.groupby(taxa_hits.index).apply(list)
 
     return taxa_hits
