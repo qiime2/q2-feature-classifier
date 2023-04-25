@@ -32,19 +32,19 @@ def find_consensus_annotation(search_results: pd.DataFrame,
                               unassignable_label: str =
                               DEFAULTUNASSIGNABLELABEL
                               ) -> pd.DataFrame:
-    '''Find consensus taxonomy from BLAST6Format alignment summary.
+    """Find consensus taxonomy from BLAST6Format alignment summary.
 
     search_results: pd.dataframe
         BLAST6Format search results with canonical headers attached.
     reference_taxonomy: pd.Series
         Annotations of reference database used for original search.
     min_consensus : float
-        The minimum fraction of the annotations that a specfic annotation
+        The minimum fraction of the annotations that a specific annotation
         must be present in for that annotation to be accepted. Current
         lower boundary is 0.51.
     unassignable_label : str
         The label to apply if no acceptable annotations are identified.
-    '''
+    """
     # load and convert blast6format results to dict of taxa hits
     obs_taxa = _blast6format_df_to_series_of_lists(
         search_results, reference_taxonomy,
@@ -87,7 +87,7 @@ plugin.methods.register_function(
 def _blast6format_df_to_series_of_lists(
         assignments, ref_taxa,
         unassignable_label=DEFAULTUNASSIGNABLELABEL):
-    '''import observed assignments in blast6 format to series of lists.
+    """import observed assignments in blast6 format to series of lists.
 
     assignments: pd.DataFrame
         Taxonomy observation map in blast format 6. Each line consists of
@@ -99,7 +99,7 @@ def _blast6format_df_to_series_of_lists(
             <accession ID>  Annotation
         The accession IDs in this taxonomy should match the subject-seq-ids in
         the "assignment" input.
-    '''
+    """
     # validate that assignments are present in reference taxonomy
     # (i.e., that the correct reference taxonomy was used).
     # Note that we drop unassigned labels from this set.
@@ -134,7 +134,7 @@ def _compute_consensus_annotations(
         ----------
         query_annotations : pd.Series of lists
             Indices are query identifiers, and values are lists of all
-            taxonomic annotations associated with that identfier.
+            taxonomic annotations associated with that identifier.
         Returns
         -------
         pd.DataFrame
@@ -194,7 +194,7 @@ def _lca_consensus(annotations, min_consensus, unassignable_label):
         annotations : list of lists
             Taxonomic annotations to form consensus.
         min_consensus : float
-            The minimum fraction of the annotations that a specfic annotation
+            The minimum fraction of the annotations that a specific annotation
             must be present in for that annotation to be accepted. Current
             lower boundary is 0.51.
         unassignable_label : str
@@ -214,7 +214,7 @@ def _lca_consensus(annotations, min_consensus, unassignable_label):
     # This assumes that a hierarchical taxonomy with even numbers of
     # ranks was used.
     taxa_comparison = [Counter(rank) for rank in zip(*annotations)]
-    # interate rank comparisons in reverse
+    # iterate rank comparisons in reverse
     # to find rank with consensus count > threshold
     for rank in taxa_comparison[::-1]:
         # grab most common label and its count
