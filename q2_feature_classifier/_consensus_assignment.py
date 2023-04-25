@@ -85,8 +85,10 @@ plugin.methods.register_function(
 
 
 def _blast6format_df_to_series_of_lists(
-        assignments, ref_taxa,
-        unassignable_label=DEFAULTUNASSIGNABLELABEL):
+        assignments: pd.DataFrame,
+        ref_taxa: pd.Series,
+        unassignable_label: str = DEFAULTUNASSIGNABLELABEL
+) -> pd.Series:
     """import observed assignments in blast6 format to series of lists.
 
     assignments: pd.DataFrame
