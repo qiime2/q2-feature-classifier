@@ -22,6 +22,13 @@ class BLASTDBFileFmtV5(model.BinaryFileFormat):
 
 
 class BLASTDBDirFmtV5(model.DirectoryFormat):
+    # TODO: is there a more robust way to do this/make some files optional?
+    # Some file extensions were introduced with more recent versions of 
+    # blast, but are not actually needed for our purposes. Making these 
+    # optional would allow more flexibility in blast versions, avoiding
+    # possible dependency conflicts.
+    # NOTE that the .n?? extensions are also nucleotide database specific.
+    # should we rather call the type/formats BLASTNucDB*?
     idx1 = model.File(r'.+\.ndb', format=BLASTDBFileFmtV5)
     idx2 = model.File(r'.+\.nhr', format=BLASTDBFileFmtV5)
     idx3 = model.File(r'.+\.nin', format=BLASTDBFileFmtV5)
@@ -29,6 +36,7 @@ class BLASTDBDirFmtV5(model.DirectoryFormat):
     idx5 = model.File(r'.+\.nsq', format=BLASTDBFileFmtV5)
     idx6 = model.File(r'.+\.ntf', format=BLASTDBFileFmtV5)
     idx7 = model.File(r'.+\.nto', format=BLASTDBFileFmtV5)
+    idx8 = model.File(r'.+\.njs', format=BLASTDBFileFmtV5)
 
     # borrowed from q2-types
     def get_basename(self):
