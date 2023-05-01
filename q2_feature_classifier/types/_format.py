@@ -36,6 +36,8 @@ class BLASTDBDirFmtV5(model.DirectoryFormat):
     idx5 = model.File(r'.+\.nsq', format=BLASTDBFileFmtV5)
     idx6 = model.File(r'.+\.ntf', format=BLASTDBFileFmtV5)
     idx7 = model.File(r'.+\.nto', format=BLASTDBFileFmtV5)
+    # introducted in blast 2.13.0
+    # https://ncbiinsights.ncbi.nlm.nih.gov/2022/03/29/blast-2-13-0/
     idx8 = model.File(r'.+\.njs', format=BLASTDBFileFmtV5)
 
     # borrowed from q2-types
