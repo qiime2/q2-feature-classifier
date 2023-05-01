@@ -6,6 +6,8 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+import os
+import itertools
 from qiime2.plugin import model
 from ..plugin_setup import plugin, citations
 
@@ -27,6 +29,22 @@ class BLASTDBDirFmtV5(model.DirectoryFormat):
     idx5 = model.File(r'.+\.nsq', format=BLASTDBFileFmtV5)
     idx6 = model.File(r'.+\.ntf', format=BLASTDBFileFmtV5)
     idx7 = model.File(r'.+\.nto', format=BLASTDBFileFmtV5)
+
+    # borrowed from q2-types
+    def get_basename(self):
+        paths = [str(x.relative_to(self.path)) for x in self.path.iterdir()]
+        prefix = os.path.splitext(_get_prefix(paths))[0]
+        return prefix
+
+
+# SO: https://stackoverflow.com/a/6718380/579416
+def _get_prefix(strings):
+    def all_same(x):
+        return all(x[0] == y for y in x)
+
+    char_tuples = zip(*strings)
+    prefix_tuples = itertools.takewhile(all_same, char_tuples)
+    return ''.join(x[0] for x in prefix_tuples)
 
 
 plugin.register_views(BLASTDBDirFmtV5,

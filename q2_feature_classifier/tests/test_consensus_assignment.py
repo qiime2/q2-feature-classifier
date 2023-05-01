@@ -31,6 +31,20 @@ class SequenceSearchTests(FeatureClassifierTestPluginBase):
             'FeatureData[Sequence]',
             self.get_data_path('se-dna-sequences.fasta'))
 
+    # The blastdb format is not documented in enough detail to validate
+    # so for now we just run together with blastn to validate.
+    def test_makeblastdb_and_blast(self):
+        db, = qfc.actions.makeblastdb(self.ref)
+        print(db)
+        result1, = qfc.actions.blast(self.query, blastdb=db)
+        result2, = qfc.actions.blast(self.query, self.ref)
+        pdt.assert_frame_equal(result1.view(pd.DataFrame),
+                               result2.view(pd.DataFrame))
+        with self.assertRaisesRegex(ValueError, "Only one.*can be provided"):
+            qfc.actions.blast(self.query, reference_reads=self.ref, blastdb=db)
+        with self.assertRaisesRegex(ValueError, "Either.*must be provided"):
+            qfc.actions.blast(self.query)
+
     def test_blast(self):
         result, = qfc.actions.blast(
             self.query, self.ref, maxaccepts=3, perc_identity=0.9)
@@ -164,7 +178,8 @@ class ConsensusAssignmentsTests(FeatureClassifierTestPluginBase):
     # search and/or taxonomy classification outputs.
     def test_classify_consensus_blast(self):
         result, _, = qfc.actions.classify_consensus_blast(
-            self.reads, self.reads, self.taxonomy)
+            query=self.reads, reference_reads=self.reads,
+            reference_taxonomy=self.taxonomy)
         self.assertTrue(series_is_subset(self.exp, result.view(pd.Series)))
 
     def test_classify_consensus_vsearch(self):
