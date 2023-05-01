@@ -12,6 +12,7 @@ from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
+importlib.import_module('q2_feature_classifier.types')
 importlib.import_module('q2_feature_classifier.classifier')
 importlib.import_module('q2_feature_classifier._cutter')
 importlib.import_module('q2_feature_classifier._blast')
