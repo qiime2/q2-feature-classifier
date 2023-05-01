@@ -23,8 +23,8 @@ class BLASTDBFileFmtV5(model.BinaryFileFormat):
 
 class BLASTDBDirFmtV5(model.DirectoryFormat):
     # TODO: is there a more robust way to do this/make some files optional?
-    # Some file extensions were introduced with more recent versions of 
-    # blast, but are not actually needed for our purposes. Making these 
+    # Some file extensions were introduced with more recent versions of
+    # blast, but are not actually needed for our purposes. Making these
     # optional would allow more flexibility in blast versions, avoiding
     # possible dependency conflicts.
     # NOTE that the .n?? extensions are also nucleotide database specific.
