@@ -105,7 +105,8 @@ def _blast6format_df_to_series_of_lists(
     # validate that assignments are present in reference taxonomy
     # (i.e., that the correct reference taxonomy was used).
     # Note that we drop unassigned labels from this set.
-    missing_ids = set(assignments['sseqid'].values) - set(ref_taxa.index) - {'*', ''}
+    missing_ids = \
+        set(assignments['sseqid'].values) - set(ref_taxa.index) - {'*', ''}
     if len(missing_ids) > 0:
         raise KeyError('Reference taxonomy and search results do not match. '
                        'The following identifiers were reported in the search '
@@ -115,14 +116,12 @@ def _blast6format_df_to_series_of_lists(
     # if vsearch fails to find assignment, it reports '*' as the
     # accession ID, so we will add this mapping to the reference taxonomy.
     ref_taxa['*'] = unassignable_label
-    # map accession IDs to taxonomy
-    for index, value in assignments.iterrows():
-        sseqid = assignments.iloc[index]['sseqid']
-        assignments.at[index, 'sseqid'] = ref_taxa.at[sseqid]
-    # Command used before:
-    #  taxa_hits.replace(ref_taxa, inplace=True)
+    assignments_copy = assignments.copy(deep=True)
+    for index, value in assignments_copy.iterrows():
+        sseqid = assignments_copy.iloc[index]['sseqid']
+        assignments_copy.at[index, 'sseqid'] = ref_taxa.at[sseqid]
     # convert to dict of {accession_id: [annotations]}
-    taxa_hits: pd.Series = assignments.set_index('qseqid')['sseqid']
+    taxa_hits: pd.Series = assignments_copy.set_index('qseqid')['sseqid']
     taxa_hits = taxa_hits.groupby(taxa_hits.index).apply(list)
 
     return taxa_hits
