@@ -43,6 +43,9 @@ test:
     - q2_feature_classifier
     - qiime2.plugins.feature_classifier
 
+  commands:
+    - py.test --pyargs q2_feature_classifier
+
 about:
   home: https://qiime2.org
   license: BSD-3-Clause
