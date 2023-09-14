@@ -97,13 +97,9 @@ def blast(query: DNAFASTAFormat,
         if len(missing_ids) > 0:
             # we will mirror vsearch behavior and annotate unassigneds as '*'
             # and fill other columns with 0 values (np.nan makes format error).
-            missed = pd.DataFrame(columns=result.columns)
             missed = pd.DataFrame(
                 [{'qseqid': i, 'sseqid': '*'} for i in missing_ids],
                 columns=result.columns).fillna(0)
-            # Do two separate appends to make sure that fillna does not alter
-            # any other contents from the original search results.
-            # result = result.append(missed, ignore_index=True)
             result = pd.concat([result, missed], axis=0)
     return result
 
