@@ -22,7 +22,7 @@ requirements:
     - joblib
     - scikit-bio {{ scikit_bio }}
     - biom-format {{ biom_format }}
-    - blast >=2.6.0
+    - blast >=2.13.0
     - vsearch
     - qiime2 {{ qiime2_epoch }}.*
     - q2-types {{ qiime2_epoch }}.*

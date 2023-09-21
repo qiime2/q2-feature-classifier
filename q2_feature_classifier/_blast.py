@@ -6,11 +6,14 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+import os
+import warnings
 import subprocess
 import pandas as pd
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAFASTAFormat, DNAIterator, BLAST6,
     BLAST6Format)
+from .types import BLASTDBDirFmtV5, BLASTDB
 from qiime2.plugin import Int, Str, Float, Choices, Range, Bool
 from .plugin_setup import plugin, citations
 from ._consensus_assignment import (
@@ -36,6 +39,7 @@ DEFAULTSTRAND = 'both'
 DEFAULTEVALUE = 0.001
 DEFAULTMINCONSENSUS = 0.51
 DEFAULTOUTPUTNOHITS = True
+DEFAULTNUMTHREADS = 1
 
 
 # NOTE FOR THE FUTURE: should this be called blastn? would it be possible to
@@ -46,23 +50,40 @@ DEFAULTOUTPUTNOHITS = True
 # expose different parameters etc? My feeling is let's call this `blast` for
 # now and then cross that bridge when we come to it.
 def blast(query: DNAFASTAFormat,
-          reference_reads: DNAFASTAFormat,
+          reference_reads: DNAFASTAFormat = None,
+          blastdb: BLASTDBDirFmtV5 = None,
           maxaccepts: int = DEFAULTMAXACCEPTS,
           perc_identity: float = DEFAULTPERCENTID,
           query_cov: float = DEFAULTQUERYCOV,
           strand: str = DEFAULTSTRAND,
           evalue: float = DEFAULTEVALUE,
-          output_no_hits: bool = DEFAULTOUTPUTNOHITS) -> pd.DataFrame:
+          output_no_hits: bool = DEFAULTOUTPUTNOHITS,
+          num_threads: int = DEFAULTNUMTHREADS) -> pd.DataFrame:
+    if reference_reads and blastdb:
+        raise ValueError('Only one reference_reads or blastdb artifact '
+                         'can be provided as input. Choose one and try '
+                         'again.')
     perc_identity = perc_identity * 100
     query_cov = query_cov * 100
     seqs_fp = str(query)
-    ref_fp = str(reference_reads)
     # TODO: generalize to support other blast types?
     output = BLAST6Format()
     cmd = ['blastn', '-query', seqs_fp, '-evalue', str(evalue), '-strand',
-           strand, '-outfmt', '6', '-subject', ref_fp, '-perc_identity',
-           str(perc_identity), '-qcov_hsp_perc', str(query_cov),
+           strand, '-outfmt', '6', '-perc_identity', str(perc_identity),
+           '-qcov_hsp_perc', str(query_cov), '-num_threads', str(num_threads),
            '-max_target_seqs', str(maxaccepts), '-out', str(output)]
+    if reference_reads:
+        cmd.extend(['-subject', str(reference_reads)])
+        if num_threads > 1:
+            warnings.warn('The num_threads parameters is only compatible '
+                          'when using a pre-indexed blastdb. The num_threads '
+                          'is ignored when reference_reads are provided as '
+                          'input.', UserWarning)
+    elif blastdb:
+        cmd.extend(['-db', os.path.join(blastdb.path, blastdb.get_basename())])
+    else:
+        raise ValueError('Either reference_reads or a blastdb must be '
+                         'provided as input.')
     _run_command(cmd)
     # load as dataframe to quickly validate (note: will fail now if empty)
     result = output.view(pd.DataFrame)
@@ -76,19 +97,18 @@ def blast(query: DNAFASTAFormat,
         if len(missing_ids) > 0:
             # we will mirror vsearch behavior and annotate unassigneds as '*'
             # and fill other columns with 0 values (np.nan makes format error).
-            missed = pd.DataFrame(columns=result.columns)
-            missed = missed.append(
-                [{'qseqid': i, 'sseqid': '*'} for i in missing_ids]).fillna(0)
-            # Do two separate appends to make sure that fillna does not alter
-            # any other contents from the original search results.
-            result = result.append(missed, ignore_index=True)
+            missed = pd.DataFrame(
+                [{'qseqid': i, 'sseqid': '*'} for i in missing_ids],
+                columns=result.columns).fillna(0)
+            result = pd.concat([result, missed], axis=0)
     return result
 
 
 def classify_consensus_blast(ctx,
                              query,
-                             reference_reads,
                              reference_taxonomy,
+                             blastdb=None,
+                             reference_reads=None,
                              maxaccepts=DEFAULTMAXACCEPTS,
                              perc_identity=DEFAULTPERCENTID,
                              query_cov=DEFAULTQUERYCOV,
@@ -96,13 +116,15 @@ def classify_consensus_blast(ctx,
                              evalue=DEFAULTEVALUE,
                              output_no_hits=DEFAULTOUTPUTNOHITS,
                              min_consensus=DEFAULTMINCONSENSUS,
-                             unassignable_label=DEFAULTUNASSIGNABLELABEL):
+                             unassignable_label=DEFAULTUNASSIGNABLELABEL,
+                             num_threads=DEFAULTNUMTHREADS):
     search_db = ctx.get_action('feature_classifier', 'blast')
     lca = ctx.get_action('feature_classifier', 'find_consensus_annotation')
-    result, = search_db(query=query, reference_reads=reference_reads,
+    result, = search_db(query=query, blastdb=blastdb,
+                        reference_reads=reference_reads,
                         maxaccepts=maxaccepts, perc_identity=perc_identity,
                         query_cov=query_cov, strand=strand, evalue=evalue,
-                        output_no_hits=output_no_hits)
+                        output_no_hits=output_no_hits, num_threads=num_threads)
     consensus, = lca(search_results=result,
                      reference_taxonomy=reference_taxonomy,
                      min_consensus=min_consensus,
@@ -111,6 +133,15 @@ def classify_consensus_blast(ctx,
     # visualizer generated from these results (using q2-metadata tabulate).
     # Would that be more useful to the user that the QZA?
     return consensus, result
+
+
+def makeblastdb(sequences: DNAFASTAFormat) -> BLASTDBDirFmtV5:
+    database = BLASTDBDirFmtV5()
+    build_cmd = ['makeblastdb', '-blastdb_version', '5', '-dbtype', 'nucl',
+                 '-title', 'blastdb', '-in', str(sequences),
+                 '-out', os.path.join(str(database.path), 'blastdb')]
+    _run_command(build_cmd)
+    return database
 
 
 # Replace this function with QIIME2 API for wrapping commands/binaries,
@@ -128,10 +159,14 @@ def _run_command(cmd, verbose=True):
 
 
 inputs = {'query': FeatureData[Sequence],
+          'blastdb': BLASTDB,
           'reference_reads': FeatureData[Sequence]}
 
 input_descriptions = {'query': 'Query sequences.',
-                      'reference_reads': 'Reference sequences.'}
+                      'blastdb': 'BLAST indexed database. Incompatible with '
+                      'reference_reads.',
+                      'reference_reads': 'Reference sequences. Incompatible '
+                      'with blastdb.'}
 
 classification_output = ('classification', FeatureData[Taxonomy])
 
@@ -144,6 +179,7 @@ parameters = {'evalue': Float,
               'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
               'strand': Str % Choices(['both', 'plus', 'minus']),
               'output_no_hits': Bool,
+              'num_threads': Int % Range(1, None),
               }
 
 parameter_descriptions = {
@@ -170,11 +206,26 @@ parameter_descriptions = {
                       'unclassified sequences, otherwise you may run into '
                       'errors downstream from missing feature IDs. Set to '
                       'FALSE to mirror default BLAST search.',
+    'num_threads': 'Number of threads (CPUs) to use in the BLAST search.'
 }
 
 blast6_output = ('search_results', FeatureData[BLAST6])
 
 blast6_output_description = {'search_results': 'Top hits for each query.'}
+
+
+plugin.methods.register_function(
+    function=makeblastdb,
+    inputs={'sequences': FeatureData[Sequence]},
+    parameters={},
+    outputs=[('database', BLASTDB)],
+    input_descriptions={'sequences': 'Input reference sequences.'},
+    parameter_descriptions={},
+    output_descriptions={'database': 'Output BLAST database.'},
+    name='Make BLAST database.',
+    description=('Make BLAST database from custom sequence collection.'),
+    citations=[citations['camacho2009blast+']]
+)
 
 
 # Note: name should be changed to blastn if we do NOT generalize this function
