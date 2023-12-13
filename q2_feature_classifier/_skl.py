@@ -7,7 +7,6 @@
 # ----------------------------------------------------------------------------
 
 from itertools import islice, repeat
-from copy import deepcopy
 
 from joblib import Parallel, delayed
 
