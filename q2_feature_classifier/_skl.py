@@ -75,13 +75,13 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
     split_classes = [c.split(separator) for c in pipeline.classes_]
     for seq_id, taxon, class_probs in zip(seq_ids, y, prob_pos):
         taxon = taxon.split(separator)
-        classes = zip(deepcopy(split_classes), class_probs)
+        classes = zip(split_classes, class_probs)
         result = []
-        for level in taxon:
-            classes = [cls for cls in classes if cls[0].pop(0) == level]
-            cum_prob = sum(c[1] for c in classes)
+        for rank, level in enumerate(taxon):
+            cum_prob = sum(cls[1] for cls in classes if cls[0][rank] == level)
             if cum_prob < confidence:
                 break
+            classes = zip(split_classes, class_probs)
             result.append(level)
             result_confidence = cum_prob
         if result:
