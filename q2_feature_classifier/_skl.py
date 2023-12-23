@@ -6,9 +6,48 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+from dataclasses import dataclass, field
+from functools import cached_property
 from itertools import islice, repeat
+from typing import Dict, List
 
 from joblib import Parallel, delayed
+
+
+@dataclass
+class _TaxonPredictionNode:
+    name: str
+    offset: int # The offset index of this taxon in the probability vector
+    children: Dict[str, "_TaxonPredictionNode"] = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def create_tree(cls, classes: List[str]):
+        root = cls("Unassigned", 0)
+        for i, label in enumerate(classes):
+            taxons = label.split(';')
+            node = root
+            for name in taxons:
+                if name not in node.children:
+                    node.children[name] = cls(name, i)
+                node = node.children[name]
+        return root
+
+    @property
+    def range(self) -> range:
+        return range(self.offset, self.offset + len(self))
+
+    @cached_property
+    def num_leaf_nodes(self) -> int:
+        if len(self.children) == 0:
+            return 1
+        return sum(c.num_leaf_nodes for c in self.children.values())
+
+    def __len__(self) -> int:
+        return self.num_leaf_nodes
+
+    def __getitem__(self, key: str) -> "_TaxonPredictionNode":
+        return self.children[key]
+
 
 _specific_fitters = [
         ['naive_bayes',
@@ -70,25 +109,26 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
 
     y = pipeline.classes_[prob_pos.argmax(axis=1)]
 
+    taxonomy_tree = _TaxonPredictionNode.create_tree(pipeline.classes_)
+
     results = []
-    split_classes = [c.split(separator) for c in pipeline.classes_]
     for seq_id, taxon, class_probs in zip(seq_ids, y, prob_pos):
-        taxon = taxon.split(separator)
-        classes = zip(split_classes, class_probs)
+        split_taxon = taxon.split(separator)
+        accepted_cum_prob = 0.0
+        cum_prob = 0.0
         result = []
-        for rank, level in enumerate(taxon):
-            cum_prob = sum(cls[1] for cls in classes if cls[0][rank] == level)
+        current = taxonomy_tree
+        for rank in split_taxon:
+            current = current[rank]
+            cum_prob = class_probs[current.range].sum()
             if cum_prob < confidence:
                 break
-            classes = zip(split_classes, class_probs)
-            result.append(level)
-            result_confidence = cum_prob
-        if result:
-            result = separator.join(result)
-            results.append((seq_id, result, result_confidence))
+            accepted_cum_prob = cum_prob
+            result.append(rank)
+        if len(result) == 0:
+            results.append((seq_id, "Unassigned", 1.0 - cum_prob))
         else:
-            results.append((seq_id, 'Unassigned', 1. - cum_prob))
-
+            results.append((seq_id, separator.join(result), accepted_cum_prob))
     return results
 
 
