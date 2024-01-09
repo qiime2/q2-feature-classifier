@@ -13,40 +13,44 @@ from typing import Dict, List
 
 from joblib import Parallel, delayed
 
-
+# The _TaxonNode is used to build a hierarchy from a list of sorted class
+# labels. It allows one to quickly find class label indices of taxonomy labels
+# that satisfy a given taxonomy hierarchy. For example, given the
+# 'k__Bacteria' taxon, the _TaxonNode.range property will yield all class
+# label indices where 'd__Bacteria' is a prefix.
 @dataclass
-class _TaxonPredictionNode:
+class _TaxonNode:
     name: str
-    offset: int # The offset index of this taxon in the probability vector
-    children: Dict[str, "_TaxonPredictionNode"] = field(default_factory=dict, repr=False)
+    offset_index: int # The offset index of this taxon in the class list
+    children: Dict[str, "_TaxonNode"] = field(
+        default_factory=dict,
+        repr=False)
 
     @classmethod
-    def create_tree(cls, classes: List[str]):
+    def create_tree(cls, classes: List[str], separator: str):
+        if not all(a <= b for a, b in zip(classes, classes[1:])):
+            raise Exception("classes must be in sorted order")
         root = cls("Unassigned", 0)
-        for i, label in enumerate(classes):
-            taxons = label.split(';')
+        for class_start_index, label in enumerate(classes):
+            taxons = label.split(separator)
             node = root
             for name in taxons:
                 if name not in node.children:
-                    node.children[name] = cls(name, i)
+                    node.children[name] = cls(name, class_start_index)
                 node = node.children[name]
         return root
 
     @property
     def range(self) -> range:
-        return range(self.offset, self.offset + len(self))
+        return range(
+            self.offset_index,
+            self.offset_index + self.num_leaf_nodes)
 
     @cached_property
     def num_leaf_nodes(self) -> int:
         if len(self.children) == 0:
             return 1
         return sum(c.num_leaf_nodes for c in self.children.values())
-
-    def __len__(self) -> int:
-        return self.num_leaf_nodes
-
-    def __getitem__(self, key: str) -> "_TaxonPredictionNode":
-        return self.children[key]
 
 
 _specific_fitters = [
@@ -109,7 +113,7 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
 
     y = pipeline.classes_[prob_pos.argmax(axis=1)]
 
-    taxonomy_tree = _TaxonPredictionNode.create_tree(pipeline.classes_)
+    taxonomy_tree = _TaxonNode.create_tree(pipeline.classes_, separator)
 
     results = []
     for seq_id, taxon, class_probs in zip(seq_ids, y, prob_pos):
@@ -119,7 +123,7 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
         result = []
         current = taxonomy_tree
         for rank in split_taxon:
-            current = current[rank]
+            current = current.children[rank]
             cum_prob = class_probs[current.range].sum()
             if cum_prob < confidence:
                 break
