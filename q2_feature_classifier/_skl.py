@@ -13,15 +13,17 @@ from typing import Dict, List
 
 from joblib import Parallel, delayed
 
-# The _TaxonNode is used to build a hierarchy from a list of sorted class
-# labels. It allows one to quickly find class label indices of taxonomy labels
-# that satisfy a given taxonomy hierarchy. For example, given the
-# 'k__Bacteria' taxon, the _TaxonNode.range property will yield all class
-# label indices where 'd__Bacteria' is a prefix.
+
 @dataclass
 class _TaxonNode:
+    # The _TaxonNode is used to build a hierarchy from a list of sorted class
+    # labels. It allows one to quickly find class label indices of taxonomy
+    # labels that satisfy a given taxonomy hierarchy. For example, given the
+    # 'k__Bacteria' taxon, the _TaxonNode.range property will yield all class
+    # label indices where 'd__Bacteria' is a prefix.
+
     name: str
-    offset_index: int # The offset index of this taxon in the class list
+    offset_index: int
     children: Dict[str, "_TaxonNode"] = field(
         default_factory=dict,
         repr=False)
