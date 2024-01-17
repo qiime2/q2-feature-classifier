@@ -20,7 +20,7 @@ class _TaxonNode:
     # labels. It allows one to quickly find class label indices of taxonomy
     # labels that satisfy a given taxonomy hierarchy. For example, given the
     # 'k__Bacteria' taxon, the _TaxonNode.range property will yield all class
-    # label indices where 'd__Bacteria' is a prefix.
+    # label indices where 'k__Bacteria' is a prefix.
 
     name: str
     offset_index: int
