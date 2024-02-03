@@ -16,7 +16,7 @@ import pandas as pd
 import skbio
 import biom
 
-from q2_feature_classifier._skl import _specific_fitters
+from q2_feature_classifier._skl import _specific_fitters, _TaxonNode
 from q2_feature_classifier.classifier import spec_from_pipeline, \
     pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch
 
@@ -242,3 +242,42 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
     def test_autotune_reads_per_batch_more_jobs_than_reads(self):
         self.assertEqual(
             _autotune_reads_per_batch(self.seq_path, n_jobs=1105), 1)
+
+    def test_TaxonNode_create_tree(self):
+        classes = ['a;b;c', 'a;b;d', 'a;e;f', 'a;e;g']
+        separator = ';'
+        tree = _TaxonNode.create_tree(classes, separator)
+        self.assertEqual(
+            tree.children['a'].children['b'].children['c'].name, 'c')
+        self.assertEqual(
+            tree.children['a'].children['b'].children['d'].name, 'd')
+        self.assertEqual(
+            tree.children['a'].children['e'].children['f'].name, 'f')
+        self.assertEqual(
+            tree.children['a'].children['e'].children['g'].name, 'g')
+
+    def test_TaxonNode_range(self):
+        classes = ['a;b;c', 'a;b;d', 'a;e;f', 'a;e;g']
+        separator = ';'
+        tree = _TaxonNode.create_tree(classes, separator)
+        self.assertEqual(
+            tree.children['a'].children['b'].children['c'].range, range(0, 1))
+        self.assertEqual(
+            tree.children['a'].children['b'].children['d'].range, range(1, 2))
+        self.assertEqual(
+            tree.children['a'].children['e'].children['f'].range, range(2, 3))
+        self.assertEqual(
+            tree.children['a'].children['e'].children['g'].range, range(3, 4))
+        self.assertEqual(
+            tree.children['a'].children['b'].range, range(0, 2))
+        self.assertEqual(
+            tree.children['a'].children['e'].range, range(2, 4))
+
+    def test_TaxonNode_num_leaf_nodes(self):
+        classes = ['a;b;c', 'a;b;d', 'a;e;f', 'a;e;g']
+        separator = ';'
+        tree = _TaxonNode.create_tree(classes, separator)
+        self.assertEqual(tree.num_leaf_nodes, 4)
+        self.assertEqual(tree.children['a'].num_leaf_nodes, 4)
+        self.assertEqual(tree.children['a'].children['b'].num_leaf_nodes, 2)
+        self.assertEqual(tree.children['a'].children['e'].num_leaf_nodes, 2)
