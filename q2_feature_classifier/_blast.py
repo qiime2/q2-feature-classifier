@@ -14,7 +14,8 @@ from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAFASTAFormat, DNAIterator, BLAST6,
     BLAST6Format)
 from .types import BLASTDBDirFmtV5, BLASTDB
-from qiime2.plugin import Int, Str, Float, Choices, Range, Bool
+from qiime2.plugin import Int, Str, Float, Choices, Range, Bool, Threads
+from qiime2.sdk.util import get_available_cores
 from .plugin_setup import plugin, citations
 from ._consensus_assignment import (
     min_consensus_param, min_consensus_param_description,
@@ -59,6 +60,9 @@ def blast(query: DNAFASTAFormat,
           evalue: float = DEFAULTEVALUE,
           output_no_hits: bool = DEFAULTOUTPUTNOHITS,
           num_threads: int = DEFAULTNUMTHREADS) -> pd.DataFrame:
+    if num_threads == 0:
+        num_threads = get_available_cores()
+
     if reference_reads and blastdb:
         raise ValueError('Only one reference_reads or blastdb artifact '
                          'can be provided as input. Choose one and try '
@@ -118,6 +122,9 @@ def classify_consensus_blast(ctx,
                              min_consensus=DEFAULTMINCONSENSUS,
                              unassignable_label=DEFAULTUNASSIGNABLELABEL,
                              num_threads=DEFAULTNUMTHREADS):
+    if num_threads == 0:
+        num_threads = get_available_cores()
+
     search_db = ctx.get_action('feature_classifier', 'blast')
     lca = ctx.get_action('feature_classifier', 'find_consensus_annotation')
     result, = search_db(query=query, blastdb=blastdb,
@@ -179,7 +186,7 @@ parameters = {'evalue': Float,
               'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
               'strand': Str % Choices(['both', 'plus', 'minus']),
               'output_no_hits': Bool,
-              'num_threads': Int % Range(1, None),
+              'num_threads': Threads,
               }
 
 parameter_descriptions = {
@@ -206,7 +213,8 @@ parameter_descriptions = {
                       'unclassified sequences, otherwise you may run into '
                       'errors downstream from missing feature IDs. Set to '
                       'FALSE to mirror default BLAST search.',
-    'num_threads': 'Number of threads (CPUs) to use in the BLAST search.'
+    'num_threads': 'Number of threads (CPUs) to use in the BLAST search. '
+                   'Pass 0 to use all available CPUs.',
 }
 
 blast6_output = ('search_results', FeatureData[BLAST6])

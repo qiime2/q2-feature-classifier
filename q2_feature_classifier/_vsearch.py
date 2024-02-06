@@ -13,7 +13,7 @@ import pandas as pd
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAFASTAFormat, BLAST6, BLAST6Format)
 from .plugin_setup import plugin, citations
-from qiime2.plugin import Int, Str, Float, Choices, Range, Bool
+from qiime2.plugin import Int, Str, Float, Choices, Range, Bool, Threads
 from ._blast import (_run_command)
 from ._consensus_assignment import (DEFAULTUNASSIGNABLELABEL,
                                     min_consensus_param,
@@ -214,7 +214,7 @@ parameters = {'maxaccepts': Int % Range(1, None) | Str % Choices(['all']),
               'perc_identity': Float % Range(0.0, 1.0, inclusive_end=True),
               'query_cov': Float % Range(0.0, 1.0, inclusive_end=True),
               'strand': Str % Choices(['both', 'plus']),
-              'threads': Int % Range(1, None),
+              'threads': Threads,
               'maxhits': Int % Range(1, None) | Str % Choices(['all']),
               'maxrejects': Int % Range(1, None) | Str % Choices(['all'])}
 
@@ -252,7 +252,8 @@ parameter_descriptions = {
                      'lower.',
     'query_cov': 'Reject match if query alignment coverage per high-'
                  'scoring pair is lower.',
-    'threads': 'Number of threads to use for job parallelization.',
+    'threads': 'Number of threads to use for job parallelization. Pass 0 to '
+               'use one per available CPU.',
     'maxhits': 'Maximum number of hits to show once the search is terminated.',
     'maxrejects': 'Maximum number of non-matching target sequences to '
                   'consider before stopping the search. This option works in '
