@@ -6,10 +6,54 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+from dataclasses import dataclass, field
+from functools import cached_property
 from itertools import islice, repeat
-from copy import deepcopy
+from typing import Dict, List
 
 from joblib import Parallel, delayed
+
+
+@dataclass
+class _TaxonNode:
+    # The _TaxonNode is used to build a hierarchy from a list of sorted class
+    # labels. It allows one to quickly find class label indices of taxonomy
+    # labels that satisfy a given taxonomy hierarchy. For example, given the
+    # 'k__Bacteria' taxon, the _TaxonNode.range property will yield all class
+    # label indices where 'k__Bacteria' is a prefix.
+
+    name: str
+    offset_index: int
+    children: Dict[str, "_TaxonNode"] = field(
+        default_factory=dict,
+        repr=False)
+
+    @classmethod
+    def create_tree(cls, classes: List[str], separator: str):
+        if not all(a <= b for a, b in zip(classes, classes[1:])):
+            raise Exception("classes must be in sorted order")
+        root = cls("Unassigned", 0)
+        for class_start_index, label in enumerate(classes):
+            taxons = label.split(separator)
+            node = root
+            for name in taxons:
+                if name not in node.children:
+                    node.children[name] = cls(name, class_start_index)
+                node = node.children[name]
+        return root
+
+    @property
+    def range(self) -> range:
+        return range(
+            self.offset_index,
+            self.offset_index + self.num_leaf_nodes)
+
+    @cached_property
+    def num_leaf_nodes(self) -> int:
+        if len(self.children) == 0:
+            return 1
+        return sum(c.num_leaf_nodes for c in self.children.values())
+
 
 _specific_fitters = [
         ['naive_bayes',
@@ -71,25 +115,26 @@ def _predict_chunk_with_conf(pipeline, separator, confidence, chunk):
 
     y = pipeline.classes_[prob_pos.argmax(axis=1)]
 
+    taxonomy_tree = _TaxonNode.create_tree(pipeline.classes_, separator)
+
     results = []
-    split_classes = [c.split(separator) for c in pipeline.classes_]
     for seq_id, taxon, class_probs in zip(seq_ids, y, prob_pos):
-        taxon = taxon.split(separator)
-        classes = zip(deepcopy(split_classes), class_probs)
+        split_taxon = taxon.split(separator)
+        accepted_cum_prob = 0.0
+        cum_prob = 0.0
         result = []
-        for level in taxon:
-            classes = [cls for cls in classes if cls[0].pop(0) == level]
-            cum_prob = sum(c[1] for c in classes)
+        current = taxonomy_tree
+        for rank in split_taxon:
+            current = current.children[rank]
+            cum_prob = class_probs[current.range].sum()
             if cum_prob < confidence:
                 break
-            result.append(level)
-            result_confidence = cum_prob
-        if result:
-            result = separator.join(result)
-            results.append((seq_id, result, result_confidence))
+            accepted_cum_prob = cum_prob
+            result.append(rank)
+        if len(result) == 0:
+            results.append((seq_id, "Unassigned", 1.0 - cum_prob))
         else:
-            results.append((seq_id, 'Unassigned', 1. - cum_prob))
-
+            results.append((seq_id, separator.join(result), accepted_cum_prob))
     return results
 
 
