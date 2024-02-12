@@ -15,7 +15,6 @@ from q2_types.feature_data import (
     BLAST6Format)
 from .types import BLASTDBDirFmtV5, BLASTDB
 from qiime2.plugin import Int, Str, Float, Choices, Range, Bool, Threads
-from qiime2.sdk.util import get_available_cores
 from .plugin_setup import plugin, citations
 from ._consensus_assignment import (
     min_consensus_param, min_consensus_param_description,
