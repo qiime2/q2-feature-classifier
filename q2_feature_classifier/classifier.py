@@ -14,7 +14,8 @@ from itertools import chain, islice
 import subprocess
 
 import pandas as pd
-from qiime2.plugin import Int, Str, Float, Bool, Choices, Range, Threads
+from qiime2.plugin import (Int, Str, Float, Bool, Choices, Range, Threads,
+                                             get_available_cores)
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAIterator, DNAFASTAFormat)
 from q2_types.feature_table import FeatureTable, RelativeFrequency
