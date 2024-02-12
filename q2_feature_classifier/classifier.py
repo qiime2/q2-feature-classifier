@@ -19,7 +19,6 @@ from qiime2.plugin import (Int, Str, Float, Bool, Choices, Range, Threads,
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAIterator, DNAFASTAFormat)
 from q2_types.feature_table import FeatureTable, RelativeFrequency
-from qiime2.sdk.util import get_available_cores
 from sklearn.pipeline import Pipeline
 import sklearn
 from numpy import median, array, ceil
