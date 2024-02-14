@@ -14,7 +14,9 @@ from itertools import chain, islice
 import subprocess
 
 import pandas as pd
-from qiime2.plugin import Int, Str, Float, Bool, Choices, Range
+from qiime2.plugin import (
+    Int, Str, Float, Bool, Choices, Range, Threads, get_available_cores
+)
 from q2_types.feature_data import (
     FeatureData, Taxonomy, Sequence, DNAIterator, DNAFASTAFormat)
 from q2_types.feature_table import FeatureTable, RelativeFrequency
@@ -203,6 +205,13 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                      pre_dispatch: str = '2*n_jobs', confidence: float = 0.7,
                      read_orientation: str = 'auto'
                      ) -> pd.DataFrame:
+
+    if n_jobs in (0, -1):
+        n_jobs = get_available_cores()
+    elif n_jobs < -1:
+        n_less = abs(n_jobs + 1)
+        n_jobs = get_available_cores(n_less=n_less)
+
     try:
         # autotune reads per batch
         if reads_per_batch == 'auto':
@@ -234,7 +243,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
 
 _classify_parameters = {
     'reads_per_batch': Int % Range(1, None) | Str % Choices(['auto']),
-    'n_jobs': Int,
+    'n_jobs': Threads,
     'pre_dispatch': Str,
     'confidence': Float % Range(
         0, 1, inclusive_start=True, inclusive_end=True) | Str % Choices(
@@ -257,7 +266,7 @@ _parameter_descriptions = {
     'reads_per_batch': 'Number of reads to process in each batch. If "auto", '
                        'this parameter is autoscaled to '
                        'min( number of query sequences / n_jobs, 20000).',
-    'n_jobs': 'The maximum number of concurrently worker processes. If -1 '
+    'n_jobs': 'The maximum number of concurrent worker processes. If -1 '
               'all CPUs are used. If 1 is given, no parallel computing '
               'code is used at all, which is useful for debugging. For '
               'n_jobs below -1, (n_cpus + 1 + n_jobs) are used. Thus for '
