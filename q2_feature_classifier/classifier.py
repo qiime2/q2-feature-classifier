@@ -206,11 +206,8 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                      read_orientation: str = 'auto'
                      ) -> pd.DataFrame:
 
-    if n_jobs in (0, -1):
+    if n_jobs == 0:
         n_jobs = get_available_cores()
-    elif n_jobs < -1:
-        n_less = abs(n_jobs + 1)
-        n_jobs = get_available_cores(n_less=n_less)
 
     try:
         # autotune reads per batch
@@ -266,11 +263,9 @@ _parameter_descriptions = {
     'reads_per_batch': 'Number of reads to process in each batch. If "auto", '
                        'this parameter is autoscaled to '
                        'min( number of query sequences / n_jobs, 20000).',
-    'n_jobs': 'The maximum number of concurrent worker processes. If -1 '
+    'n_jobs': 'The maximum number of concurrent worker processes. If 0 '
               'all CPUs are used. If 1 is given, no parallel computing '
-              'code is used at all, which is useful for debugging. For '
-              'n_jobs below -1, (n_cpus + 1 + n_jobs) are used. Thus for '
-              'n_jobs = -2, all CPUs but one are used.',
+              'code is used at all, which is useful for debugging.',
     'pre_dispatch': '"all" or expression, as in "3*n_jobs". The number of '
                     'batches (of tasks) to be pre-dispatched.'
 }
