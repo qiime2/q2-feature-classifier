@@ -39,7 +39,7 @@ class CustomTests(FeatureClassifierTestPluginBase):
                 {'__type__': 'feature_extraction.text.HashingVectorizer',
                  'analyzer': 'char',
                  'n_features': 8192,
-                 'ngram_range': [8, 8],
+                 'ngram_range': (8, 8),
                  'alternate_sign': False}],
                 ['classify',
                  {'__type__': 'custom.LowMemoryMultinomialNB',
@@ -68,7 +68,7 @@ class CustomTests(FeatureClassifierTestPluginBase):
 
         params = {'analyzer': 'char',
                   'n_features': 8192,
-                  'ngram_range': [8, 8],
+                  'ngram_range': (8, 8),
                   'alternate_sign': False}
         hv = HashingVectorizer(**params)
         unchunked = hv.fit_transform(X)

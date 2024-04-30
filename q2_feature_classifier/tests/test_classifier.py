@@ -66,7 +66,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
                      {'__type__': 'feature_extraction.text.HashingVectorizer',
                       'analyzer': 'char_wb',
                       'n_features': 8192,
-                      'ngram_range': [8, 8],
+                      'ngram_range': (8, 8),
                       'alternate_sign': False}],
                     ['classify',
                      {'__type__': 'naive_bayes.GaussianNB'}]]
@@ -117,7 +117,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
                      {'__type__': 'feature_extraction.text.HashingVectorizer',
                       'analyzer': 'char_wb',
                       'n_features': 8192,
-                      'ngram_range': [8, 8],
+                      'ngram_range': (8, 8),
                       'alternate_sign': False}],
                     ['classify',
                      {'__type__': 'linear_model.LogisticRegression'}]]
