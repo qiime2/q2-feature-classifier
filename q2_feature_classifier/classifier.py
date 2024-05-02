@@ -86,6 +86,8 @@ def spec_from_pipeline(pipeline):
 
 def pipeline_from_spec(spec):
     def as_steps(obj):
+        if 'ngram_range' in obj:
+            obj['ngram_range'] = tuple(obj['ngram_range'])
         if '__type__' in obj:
             klass = _load_class(obj['__type__'])
             return klass(**{k: v for k, v in obj.items() if k != '__type__'})
@@ -332,6 +334,8 @@ def _register_fitter(name, spec):
                 kwargs[param] = json.loads(kwargs[param])
             except (json.JSONDecodeError, TypeError):
                 pass
+            if param == 'feat_ext__ngram_range':
+                kwargs[param] = tuple(kwargs[param])
         pipeline = pipeline_from_spec(spec)
         pipeline.set_params(**kwargs)
         if class_weight is not None:
