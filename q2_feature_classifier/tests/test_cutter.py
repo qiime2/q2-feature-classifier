@@ -10,7 +10,7 @@ import skbio
 
 from qiime2.sdk import Artifact
 from qiime2.plugins.feature_classifier.actions import extract_reads
-from q2_types.feature_data._format import DNAFASTAFormat
+from q2_types.feature_data import DNAFASTAFormat
 
 from . import FeatureClassifierTestPluginBase
 

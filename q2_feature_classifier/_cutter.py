@@ -12,8 +12,7 @@ from joblib import Parallel, delayed, effective_n_jobs
 
 from qiime2.plugin import Int, Str, Float, Range, Choices
 from q2_types.feature_data import (FeatureData, Sequence, DNAIterator,
-                                   DNASequencesDirectoryFormat)
-from q2_types.feature_data._format import DNAFASTAFormat
+                                   DNASequencesDirectoryFormat, DNAFASTAFormat)
 from q2_feature_classifier._skl import _chunks
 from q2_feature_classifier.classifier import _autotune_reads_per_batch
 
