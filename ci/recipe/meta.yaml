@@ -23,7 +23,7 @@ requirements:
     - scikit-bio {{ scikit_bio }}
     - biom-format {{ biom_format }}
     - blast >=2.13.0
-    - vsearch
+    - vsearch {{ vsearch }}
     - qiime2 {{ qiime2_epoch }}.*
     - q2-types {{ qiime2_epoch }}.*
     - q2-quality-control {{ qiime2_epoch }}.*
