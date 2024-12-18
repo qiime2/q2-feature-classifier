@@ -1,2 +1,0 @@
-include versioneer.py
-include q2_feature_classifier/_version.py
