@@ -1,0 +1,12 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: dfb0404
+_src_path: https://github.com/qiime2/q2-setup-template.git
+module_name: feature_classifier
+plugin_name: q2_feature_classifier
+plugin_scripts: null
+project_author_email: kaehler@gmail.com
+project_author_name: Ben Kaehler
+project_description: Functionality for taxonomic classification
+project_name: q2-feature-classifier
+project_urls_homepage: https://qiime2.org
+project_urls_repository: https://github.com/qiime2/q2-feature-classifier

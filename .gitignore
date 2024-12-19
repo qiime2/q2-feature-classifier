@@ -65,3 +65,7 @@ target/
 .*.swp
 
 .DS_Store
+
+# Version file from versioningit
+_version.py
+
