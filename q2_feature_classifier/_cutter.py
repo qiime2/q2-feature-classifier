@@ -25,7 +25,7 @@ def _seq_to_regex(seq):
     for base in str(seq):
         if base in skbio.DNA.degenerate_chars:
             result.append('[{0}]'.format(
-                ''.join(skbio.DNA.degenerate_map[base])))
+                ''.join(sorted(skbio.DNA.degenerate_map[base]))))
         else:
             result.append(base)
 
@@ -39,7 +39,7 @@ def _primers_to_regex(f_primer, r_primer):
 
 def _local_aln(primer, sequence):
     best_score = None
-    for one_primer in primer.expand_degenerates():
+    for one_primer in sorted([str(s) for s in primer.expand_degenerates()]):
         # `sequence` may contain degenerates. These will usually be N
         # characters, which SSW will score as zero. Although undocumented, SSW
         # will treat other degenerate characters as a mismatch. We acknowledge
@@ -47,7 +47,8 @@ def _local_aln(primer, sequence):
         # may be revisited in the future if there's an aligner that explicitly
         # handles degenerates.
         this_aln = \
-            skbio.alignment.local_pairwise_align_ssw(one_primer, sequence)
+            skbio.alignment.local_pairwise_align_ssw(skbio.DNA(one_primer),
+                                                     sequence)
         score = this_aln[1]
         if best_score is None or score > best_score:
             best_score = score
