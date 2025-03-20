@@ -19,11 +19,11 @@ requirements:
   - biom-format {{ biom_format }}
   - blast >=2.13.0
   - vsearch {{ vsearch }}
-  - qiime2 {{ qiime2_epoch }}.*
-  - q2-types {{ qiime2_epoch }}.*
-  - q2-quality-control {{ qiime2_epoch }}.*
-  - q2-taxa {{ qiime2_epoch }}.*
-  - q2-feature-table {{ qiime2_epoch }}.*
+  - qiime2 >={{ qiime2 }}
+  - q2-types >={{ q2_types }}
+  - q2-quality-control >={{ q2_quality_control }}
+  - q2-taxa >={{ q2_taxa }}
+  - q2-feature-table >={{ q2_feature_table }}
   build:
   - python {{ python }}
   - setuptools
