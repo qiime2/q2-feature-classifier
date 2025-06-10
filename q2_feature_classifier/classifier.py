@@ -170,6 +170,8 @@ def _autodetect_orientation(reads, classifier, n=100,
         return reads
     if read_orientation == 'reverse-complement':
         return (r.reverse_complement() for r in reads)
+    if read_orientation == 'both':
+        return reads
     first_n_reads = list(islice(reads, n))
     result = list(zip(*predict(first_n_reads, classifier, confidence=0.)))
     _, _, same_confidence = result
@@ -222,6 +224,30 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
 
         reads = _autodetect_orientation(
             reads, classifier, read_orientation=read_orientation)
+        if read_orientation == 'both':
+            tempPredict = predict(reads, classifier, chunk_size=reads_per_batch,
+                              n_jobs=n_jobs, pre_dispatch=pre_dispatch,
+                              confidence=confidence)
+            tempReversePredict = predict((r.reversre_complement() for r in reads), classifier, chunk_size=reads_per_batch,
+                              n_jobs=n_jobs, pre_dispatch=pre_dispatch,
+                              confidence=confidence)
+            seq_ids1, taxonomy1, confidence1 = list(zip(*tempPredict))
+            seq_ids2, taxonomy2, confidence2 = list(zip(*tempReversePredict))
+            if confidence1 > confidence2:
+                result = pd.DataFrame({'Taxon': taxonomy1, 'Confidence': confidence1},
+                              index=seq_ids1, columns=['Taxon', 'Confidence'])
+                result.index.name = 'Feature ID'
+                return result
+            if confidence1 < confidence2:
+                result = pd.DataFrame({'Taxon': taxonomy2, 'Confidence': confidence2},
+                              index=seq_ids2, columns=['Taxon', 'Confidence'])
+                result.index.name = 'Feature ID'
+                return result
+            result = pd.DataFrame({'Taxon': taxonomy2, 'Confidence': confidence2},
+                                  index=seq_ids2, columns=['Taxon', 'Confidence'])
+            result.index.name = 'Feature ID'
+            return result
+
         predictions = predict(reads, classifier, chunk_size=reads_per_batch,
                               n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                               confidence=confidence)
@@ -247,7 +273,7 @@ _classify_parameters = {
     'confidence': Float % Range(
         0, 1, inclusive_start=True, inclusive_end=True) | Str % Choices(
             ['disable']),
-    'read_orientation': Str % Choices(['same', 'reverse-complement', 'auto'])}
+    'read_orientation': Str % Choices(['same', 'reverse-complement', 'auto', 'both'])}
 
 _parameter_descriptions = {
     'confidence': 'Confidence threshold for limiting '
