@@ -302,3 +302,22 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         rc = class_rev.classification.view(pd.Series).to_dict()
         for taxon in bc:
             self.assertEqual(bc[taxon], rc[taxon])
+        seq_path_2 = self.get_data_path('dna_sequence_both_test.fasta')
+        reads_2 = Artifact.import_data('FeatureData[Sequence]',
+                                       seq_path_2)
+        fwd_2 = classify(reads_2, self.classifier, read_orientation='same')
+        rev_2 = classify(reads_2, self.classifier,
+                         read_orientation='reverse-complement')
+        fc_2 = fwd_2.classification.view(pd.DataFrame)
+        rc_2 = rev_2.classification.view(pd.DataFrame)
+        conf_fwd_2 = fc_2['Confidence'].astype(float).values
+        conf_rev_2 = rc_2['Confidence'].astype(float).values
+        self.assertLess(np.median(np.array(conf_rev_2)),
+                        np.median(np.array(conf_fwd_2)))
+        class_both_2 = classify(reads_2, self.classifier,
+                                read_orientation='both')
+        bc_2 = class_both_2.classification.view(pd.Series).to_dict()
+        rc_2 = rev_2.classification.view(pd.Series).to_dict()
+        for taxon in bc_2:
+            self.assertEqual(bc_2[taxon], rc_2[taxon])
+
