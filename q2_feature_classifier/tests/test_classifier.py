@@ -18,9 +18,9 @@ import biom
 
 from q2_feature_classifier._skl import _specific_fitters, _TaxonNode
 from q2_feature_classifier.classifier import spec_from_pipeline, \
-    pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch
-
+    pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch, classify_sklearn
 from . import FeatureClassifierTestPluginBase
+import numpy as np
 
 
 class ClassifierTests(FeatureClassifierTestPluginBase):
@@ -281,3 +281,24 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         self.assertEqual(tree.children['a'].num_leaf_nodes, 4)
         self.assertEqual(tree.children['a'].children['b'].num_leaf_nodes, 2)
         self.assertEqual(tree.children['a'].children['e'].num_leaf_nodes, 2)
+
+    def test_both_orientations(self):
+        classify = feature_classifier.methods.classify_sklearn
+        seq_path = self.get_data_path('dna_sequences_150.fasta')
+        reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
+        class_fwd = classify(reads, self.classifier, read_orientation='same')
+        class_rev = classify(reads, self.classifier,
+                             read_orientation='reverse-complement')
+        fc = class_fwd.classification.view(pd.DataFrame)
+        rc = class_rev.classification.view(pd.DataFrame)
+        conf_fwd = fc['Confidence'].astype(float).values
+        conf_rev = rc['Confidence'].astype(float).values
+        self.assertNotEqual(np.median(np.array(conf_fwd)),
+                            np.median(np.array(conf_rev)))
+        self.assertLess(np.median(np.array(conf_fwd)),
+                        np.median(np.array(conf_rev)))
+        class_both = classify(reads, self.classifier, read_orientation='both')
+        bc = class_both.classification.view(pd.Series).to_dict()
+        rc = class_rev.classification.view(pd.Series).to_dict()
+        for taxon in bc:
+            self.assertEqual(bc[taxon], rc[taxon])

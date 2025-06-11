@@ -224,21 +224,22 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
 
         reads = _autodetect_orientation(
             reads, classifier, read_orientation=read_orientation)
+        reads_list = list(reads)
         if read_orientation == 'both':
-            tempPredict = predict(reads, classifier, chunk_size=reads_per_batch,
+            temp_predict = predict(reads_list, classifier, chunk_size=reads_per_batch,
                               n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                               confidence=confidence)
-            tempReversePredict = predict((r.reversre_complement() for r in reads), classifier, chunk_size=reads_per_batch,
+            temp_reverse_predict = predict((r.reverse_complement() for r in reads_list), classifier, chunk_size=reads_per_batch,
                               n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                               confidence=confidence)
-            seq_ids1, taxonomy1, confidence1 = list(zip(*tempPredict))
-            seq_ids2, taxonomy2, confidence2 = list(zip(*tempReversePredict))
-            if confidence1 > confidence2:
+            seq_ids1, taxonomy1, confidence1 = list(zip(*temp_predict))
+            seq_ids2, taxonomy2, confidence2 = list(zip(*temp_reverse_predict))
+            if median(array(confidence1) - array(confidence2)) > 0.:
                 result = pd.DataFrame({'Taxon': taxonomy1, 'Confidence': confidence1},
                               index=seq_ids1, columns=['Taxon', 'Confidence'])
                 result.index.name = 'Feature ID'
                 return result
-            if confidence1 < confidence2:
+            if median(array(confidence1) - array(confidence2)) < 0.:
                 result = pd.DataFrame({'Taxon': taxonomy2, 'Confidence': confidence2},
                               index=seq_ids2, columns=['Taxon', 'Confidence'])
                 result.index.name = 'Feature ID'
@@ -248,7 +249,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
             result.index.name = 'Feature ID'
             return result
 
-        predictions = predict(reads, classifier, chunk_size=reads_per_batch,
+        predictions = predict(reads_list, classifier, chunk_size=reads_per_batch,
                               n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                               confidence=confidence)
         seq_ids, taxonomy, confidence = list(zip(*predictions))
@@ -286,6 +287,9 @@ _parameter_descriptions = {
                         'reads to be classified unchanged; reverse-'
                         'complement will cause reads to be reversed '
                         'and complemented prior to classification. '
+                        'Both will classify sequences unchanged and in '
+                        'reverse-complement and retain the '
+                        'classification with higher confidence.'
                         '"auto" will autodetect orientation based on the '
                         'confidence estimates for the first 100 reads.',
     'reads_per_batch': 'Number of reads to process in each batch. If "auto", '
