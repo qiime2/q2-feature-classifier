@@ -18,7 +18,7 @@ import biom
 
 from q2_feature_classifier._skl import _specific_fitters, _TaxonNode
 from q2_feature_classifier.classifier import spec_from_pipeline, \
-    pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch, classify_sklearn
+    pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch
 from . import FeatureClassifierTestPluginBase
 import numpy as np
 
