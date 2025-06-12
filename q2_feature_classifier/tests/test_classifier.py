@@ -182,13 +182,15 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
                        'fasta', rev_path)
         rev_reads = Artifact.import_data('FeatureData[Sequence]', rev_path)
 
-        result = classify(reads, self.classifier)
+        result = classify(reads, self.classifier,
+                          read_orientation = 'auto')
         fc = result.classification.view(pd.Series).to_dict()
-        result = classify(rev_reads, self.classifier)
+        result = classify(rev_reads, self.classifier,
+                          read_orientation = 'auto')
         rc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
-            self.assertTrue(rc[taxon].startswith(fc[taxon]))
+            self.assertEqual(rc[taxon], fc[taxon])
 
         result = classify(reads, self.classifier, read_orientation='same')
         fc = result.classification.view(pd.Series).to_dict()
@@ -200,11 +202,11 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             self.assertEqual(fc[taxon], rc[taxon])
 
         result = classify(reads, self.classifier, reads_per_batch=100,
-                          n_jobs=2)
+                          n_jobs=2, read_orientation='auto')
         cc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
-            self.assertTrue(fc[taxon].startswith(cc[taxon]))
+            self.assertEqual(fc[taxon], cc[taxon])
 
     def test_unassigned_taxa(self):
         # classifications that don't meet the threshold should be "Unassigned"
