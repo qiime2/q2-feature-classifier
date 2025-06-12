@@ -147,7 +147,7 @@ def classify_hybrid_vsearch_sklearn(ctx,
                                     maxrejects=DEFAULTMAXREJECTS,
                                     reads_per_batch='auto',
                                     confidence=0.7,
-                                    read_orientation='auto',
+                                    read_orientation='both',
                                     threads=DEFAULTTHREADS,
                                     prefilter=True,
                                     sample_size=1000,
@@ -394,7 +394,11 @@ plugin.pipelines.register_function(
                             'same will cause reads to be classified unchanged'
                             '; reverse-complement will cause reads to be '
                             'reversed and complemented prior to '
-                            'classification. "auto" will autodetect '
+                            'classification. Both will classify sequences '
+                            'unchanged and in '
+                            'reverse-complement and retain the '
+                            'classification with higher confidence.'
+                            '"auto" will autodetect '
                             'orientation based on the confidence estimates '
                             'for the first 100 reads.',
         'reads_per_batch': 'Number of reads to process in each batch for '

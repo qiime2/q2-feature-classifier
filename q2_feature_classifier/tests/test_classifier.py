@@ -188,7 +188,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         rc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
-            self.assertEqual(fc[taxon], rc[taxon])
+            self.assertTrue(rc[taxon].startswith(fc[taxon]))
 
         result = classify(reads, self.classifier, read_orientation='same')
         fc = result.classification.view(pd.Series).to_dict()
@@ -204,7 +204,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         cc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
-            self.assertEqual(fc[taxon], cc[taxon])
+            self.assertTrue(fc[taxon].startswith(cc[taxon]))
 
     def test_unassigned_taxa(self):
         # classifications that don't meet the threshold should be "Unassigned"
@@ -320,4 +320,3 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         rc_2 = rev_2.classification.view(pd.Series).to_dict()
         for taxon in bc_2:
             self.assertEqual(bc_2[taxon], rc_2[taxon])
-

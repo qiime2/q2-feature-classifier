@@ -207,7 +207,7 @@ def _autotune_reads_per_batch(reads, n_jobs):
 def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                      reads_per_batch: int = 'auto', n_jobs: int = 1,
                      pre_dispatch: str = '2*n_jobs', confidence: float = 0.7,
-                     read_orientation: str = 'auto'
+                     read_orientation: str = 'both'
                      ) -> pd.DataFrame:
 
     if n_jobs == 0:
@@ -221,31 +221,38 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
         # transform reads to DNAIterator
         reads = DNAIterator(
             skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
-
         reads = _autodetect_orientation(
             reads, classifier, read_orientation=read_orientation)
         reads_list = list(reads)
         if read_orientation == 'both':
-            temp_predict = predict(reads_list, classifier, chunk_size=reads_per_batch,
+            temp_predict = predict(reads_list, classifier,
+                                   chunk_size=reads_per_batch,
                               n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                               confidence=confidence)
-            temp_reverse_predict = predict((r.reverse_complement() for r in reads_list), classifier, chunk_size=reads_per_batch,
+            temp_reverse_predict = predict((r.reverse_complement()
+                                for r in reads_list), classifier,
+                                           chunk_size=reads_per_batch,
                               n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                               confidence=confidence)
             seq_ids1, taxonomy1, confidence1 = list(zip(*temp_predict))
             seq_ids2, taxonomy2, confidence2 = list(zip(*temp_reverse_predict))
-            if median(array(confidence1) - array(confidence2)) > 0.:
-                result = pd.DataFrame({'Taxon': taxonomy1, 'Confidence': confidence1},
+            diff = median(array(confidence1) - array(confidence2))
+            tolerance = 1e-3
+            if diff > tolerance:
+                result = pd.DataFrame(
+                    {'Taxon': taxonomy1, 'Confidence': confidence1},
                               index=seq_ids1, columns=['Taxon', 'Confidence'])
                 result.index.name = 'Feature ID'
                 return result
-            if median(array(confidence1) - array(confidence2)) < 0.:
-                result = pd.DataFrame({'Taxon': taxonomy2, 'Confidence': confidence2},
+            if diff < -tolerance:
+                result = pd.DataFrame(
+                    {'Taxon': taxonomy2, 'Confidence': confidence2},
                               index=seq_ids2, columns=['Taxon', 'Confidence'])
                 result.index.name = 'Feature ID'
                 return result
-            result = pd.DataFrame({'Taxon': taxonomy2, 'Confidence': confidence2},
-                                  index=seq_ids2, columns=['Taxon', 'Confidence'])
+            result = pd.DataFrame({
+                                'Taxon': taxonomy2, 'Confidence': confidence2},
+                                index=seq_ids2, columns=['Taxon', 'Confidence'])
             result.index.name = 'Feature ID'
             return result
 
