@@ -236,26 +236,25 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                               confidence=confidence)
             seq_ids1, taxonomy1, confidence1 = list(zip(*temp_predict))
             seq_ids2, taxonomy2, confidence2 = list(zip(*temp_reverse_predict))
-            diff = median(array(confidence1) - array(confidence2))
-            tolerance = 1e-3
-            if diff > tolerance:
-                result = pd.DataFrame(
-                    {'Taxon': taxonomy1, 'Confidence': confidence1},
-                              index=seq_ids1, columns=['Taxon', 'Confidence'])
-                result.index.name = 'Feature ID'
-                return result
-            if diff < -tolerance:
-                result = pd.DataFrame(
-                    {'Taxon': taxonomy2, 'Confidence': confidence2},
-                              index=seq_ids2, columns=['Taxon', 'Confidence'])
-                result.index.name = 'Feature ID'
-                return result
-            result = pd.DataFrame({
-                                'Taxon': taxonomy2, 'Confidence': confidence2},
-                                index=seq_ids2, columns=['Taxon', 'Confidence'])
-            result.index.name = 'Feature ID'
-            return result
-
+            seq_dict_1 = dict(zip(seq_ids1, zip(taxonomy1, confidence1)))
+            seq_dict_2 = dict(zip(seq_ids2, zip(taxonomy2, confidence2)))
+            df_result = pd.DataFrame()
+            for seq_id in seq_dict_1:
+                if seq_dict_1[seq_id][1] > seq_dict_2[seq_id][1]:
+                    result = pd.DataFrame(
+                        {'Taxon': [seq_dict_1[seq_id][0]],
+                         'Confidence': [seq_dict_1[seq_id][1]]},
+                        index=[seq_id], columns=['Taxon', 'Confidence'])
+                    result.index.name = 'Feature ID'
+                    df_result = pd.concat([df_result, result])
+                else:
+                    result = pd.DataFrame(
+                        {'Taxon': [seq_dict_2[seq_id][0]],
+                         'Confidence': [seq_dict_2[seq_id][1]]},
+                        index=[seq_id], columns=['Taxon', 'Confidence'])
+                    result.index.name = 'Feature ID'
+                    df_result = pd.concat([df_result, result])
+            return df_result
         predictions = predict(reads_list, classifier, chunk_size=reads_per_batch,
                               n_jobs=n_jobs, pre_dispatch=pre_dispatch,
                               confidence=confidence)
@@ -281,7 +280,8 @@ _classify_parameters = {
     'confidence': Float % Range(
         0, 1, inclusive_start=True, inclusive_end=True) | Str % Choices(
             ['disable']),
-    'read_orientation': Str % Choices(['same', 'reverse-complement', 'auto', 'both'])}
+    'read_orientation': Str % Choices(['same', 'reverse-complement', 'auto',
+                                                'both'])}
 
 _parameter_descriptions = {
     'confidence': 'Confidence threshold for limiting '

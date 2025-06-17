@@ -9,6 +9,10 @@
 import json
 import os
 
+from unittest.mock import patch
+import numpy as np
+from sklearn.dummy import DummyClassifier
+from sklearn.pipeline import Pipeline
 from qiime2.sdk import Artifact
 from q2_types.feature_data import DNAIterator
 from qiime2.plugins import feature_classifier
@@ -20,7 +24,6 @@ from q2_feature_classifier._skl import _specific_fitters, _TaxonNode
 from q2_feature_classifier.classifier import spec_from_pipeline, \
     pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch
 from . import FeatureClassifierTestPluginBase
-import numpy as np
 
 
 class ClassifierTests(FeatureClassifierTestPluginBase):
@@ -183,10 +186,10 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         rev_reads = Artifact.import_data('FeatureData[Sequence]', rev_path)
 
         result = classify(reads, self.classifier,
-                          read_orientation = 'auto')
+                          read_orientation='auto')
         fc = result.classification.view(pd.Series).to_dict()
         result = classify(rev_reads, self.classifier,
-                          read_orientation = 'auto')
+                          read_orientation='auto')
         rc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
@@ -285,40 +288,58 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         self.assertEqual(tree.children['a'].children['e'].num_leaf_nodes, 2)
 
     def test_both_orientations(self):
-        classify = feature_classifier.methods.classify_sklearn
-        seq_path = self.get_data_path('dna_sequences_150.fasta')
-        reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
-        class_fwd = classify(reads, self.classifier, read_orientation='same')
-        class_rev = classify(reads, self.classifier,
-                             read_orientation='reverse-complement')
-        fc = class_fwd.classification.view(pd.DataFrame)
-        rc = class_rev.classification.view(pd.DataFrame)
-        conf_fwd = fc['Confidence'].astype(float).values
-        conf_rev = rc['Confidence'].astype(float).values
-        self.assertNotEqual(np.median(np.array(conf_fwd)),
-                            np.median(np.array(conf_rev)))
-        self.assertLess(np.median(np.array(conf_fwd)),
-                        np.median(np.array(conf_rev)))
-        class_both = classify(reads, self.classifier, read_orientation='both')
-        bc = class_both.classification.view(pd.Series).to_dict()
-        rc = class_rev.classification.view(pd.Series).to_dict()
-        for taxon in bc:
-            self.assertEqual(bc[taxon], rc[taxon])
-        seq_path_2 = self.get_data_path('dna_sequence_both_test.fasta')
-        reads_2 = Artifact.import_data('FeatureData[Sequence]',
-                                       seq_path_2)
-        fwd_2 = classify(reads_2, self.classifier, read_orientation='same')
-        rev_2 = classify(reads_2, self.classifier,
-                         read_orientation='reverse-complement')
-        fc_2 = fwd_2.classification.view(pd.DataFrame)
-        rc_2 = rev_2.classification.view(pd.DataFrame)
-        conf_fwd_2 = fc_2['Confidence'].astype(float).values
-        conf_rev_2 = rc_2['Confidence'].astype(float).values
-        self.assertLess(np.median(np.array(conf_rev_2)),
-                        np.median(np.array(conf_fwd_2)))
-        class_both_2 = classify(reads_2, self.classifier,
-                                read_orientation='both')
-        bc_2 = class_both_2.classification.view(pd.Series).to_dict()
-        rc_2 = rev_2.classification.view(pd.Series).to_dict()
-        for taxon in bc_2:
-            self.assertEqual(bc_2[taxon], rc_2[taxon])
+        with patch('q2_feature_classifier.classifier.predict') as mock_predict:
+            mock_predict.side_effect = [
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__A', 0.6),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__B', 0.9)],
+
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__C', 0.9),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__D', 0.6)],
+
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__C', 0.9),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__D', 0.6)],
+
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__A', 0.6),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__B', 0.9)]
+
+                ]
+
+            X_fake = np.array([[0], [1]])
+            Y_fake = np.array(['a', 'b'])
+
+            mock_pipeline = Pipeline([('mock', DummyClassifier())])
+            mock_pipeline.fit(X_fake, Y_fake)
+            mock_classifier = Artifact.import_data('TaxonomicClassifier',
+                                                   mock_pipeline)
+
+            classify = feature_classifier.methods.classify_sklearn
+            seq_path = self.get_data_path('dna_sequence_both_test.fasta')
+            reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
+            class_fwd = classify(reads, classifier=mock_classifier,
+                                 read_orientation='same')
+            class_rev = classify(reads, classifier=mock_classifier,
+                                 read_orientation='reverse-complement')
+            class_both = classify(reads, classifier=mock_classifier,
+                                  read_orientation='both')
+            fc_df = class_fwd.classification.view(pd.DataFrame)
+            rc_df = class_rev.classification.view(pd.DataFrame)
+            conf_fwd = float(fc_df.loc['DNA_SEQUENCE_1', 'Confidence'])
+            conf_rev = float(rc_df.loc['DNA_SEQUENCE_1', 'Confidence'])
+            print(fc_df)
+            print(rc_df)
+            self.assertGreater(conf_rev, conf_fwd)
+            bc_df = class_both.classification.view(pd.DataFrame)
+            print(bc_df)
+            bc_tax_1 = bc_df.loc['DNA_SEQUENCE_1', 'Taxon']
+            rc_tax_1 = rc_df.loc['DNA_SEQUENCE_1', 'Taxon']
+            fc_tax_1 = fc_df.loc['DNA_SEQUENCE_1', 'Taxon']
+            self.assertNotEqual(fc_tax_1, rc_tax_1)
+            self.assertEqual(bc_tax_1, rc_tax_1)
+            conf_fwd_2 = float(fc_df.loc['DNA_SEQUENCE_2', 'Confidence'])
+            conf_rev_2 = float(rc_df.loc['DNA_SEQUENCE_2', 'Confidence'])
+            self.assertGreater(conf_fwd_2, conf_rev_2)
+            bc_tax_2 = bc_df.loc['DNA_SEQUENCE_2', 'Taxon']
+            rc_tax_2 = rc_df.loc['DNA_SEQUENCE_2', 'Taxon']
+            fc_tax_2 = fc_df.loc['DNA_SEQUENCE_2', 'Taxon']
+            self.assertNotEqual(rc_tax_2, fc_tax_2)
+            self.assertEqual(bc_tax_2, fc_tax_2)
