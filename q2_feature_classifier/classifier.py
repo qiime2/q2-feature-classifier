@@ -225,15 +225,22 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
             reads, classifier, read_orientation=read_orientation)
         reads_list = list(reads)
         if read_orientation == 'both':
-            temp_predict = predict(reads_list, classifier,
-                                   chunk_size=reads_per_batch,
-                              n_jobs=n_jobs, pre_dispatch=pre_dispatch,
-                              confidence=confidence)
-            temp_reverse_predict = predict((r.reverse_complement()
-                                for r in reads_list), classifier,
-                                           chunk_size=reads_per_batch,
-                              n_jobs=n_jobs, pre_dispatch=pre_dispatch,
-                              confidence=confidence)
+            temp_predict = predict(
+                reads_list,
+                classifier,
+                chunk_size=reads_per_batch,
+                n_jobs=n_jobs,
+                pre_dispatch=pre_dispatch,
+                confidence=confidence
+            )
+            temp_reverse_predict = predict(
+                (r.reverse_complement()for r in reads_list),
+                classifier,
+                chunk_size=reads_per_batch,
+                n_jobs=n_jobs,
+                pre_dispatch=pre_dispatch,
+                confidence=confidence
+            )
             seq_ids1, taxonomy1, confidence1 = list(zip(*temp_predict))
             seq_ids2, taxonomy2, confidence2 = list(zip(*temp_reverse_predict))
             seq_dict_1 = dict(zip(seq_ids1, zip(taxonomy1, confidence1)))
@@ -255,9 +262,14 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                     result.index.name = 'Feature ID'
                     df_result = pd.concat([df_result, result])
             return df_result
-        predictions = predict(reads_list, classifier, chunk_size=reads_per_batch,
-                              n_jobs=n_jobs, pre_dispatch=pre_dispatch,
-                              confidence=confidence)
+        predictions = predict(
+            reads_list,
+            classifier,
+            chunk_size=reads_per_batch,
+            n_jobs=n_jobs,
+            pre_dispatch=pre_dispatch,
+            confidence=confidence
+        )
         seq_ids, taxonomy, confidence = list(zip(*predictions))
 
         result = pd.DataFrame({'Taxon': taxonomy, 'Confidence': confidence},
@@ -281,7 +293,7 @@ _classify_parameters = {
         0, 1, inclusive_start=True, inclusive_end=True) | Str % Choices(
             ['disable']),
     'read_orientation': Str % Choices(['same', 'reverse-complement', 'auto',
-                                                'both'])}
+                                      'both'])}
 
 _parameter_descriptions = {
     'confidence': 'Confidence threshold for limiting '
