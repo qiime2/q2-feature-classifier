@@ -219,30 +219,32 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
             reads_per_batch = _autotune_reads_per_batch(reads, n_jobs)
 
         # transform reads to DNAIterator
-        reads = DNAIterator(
+        reads_iter = DNAIterator(
             skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
-        reads = _autodetect_orientation(
-            reads, classifier, read_orientation=read_orientation)
-        reads_list = list(reads)
+        reads_iter = _autodetect_orientation(
+            reads_iter, classifier, read_orientation=read_orientation)
+
         if read_orientation == 'both':
-            temp_predict = predict(
-                reads_list,
+            same_predict = predict(
+                reads_iter,
                 classifier,
                 chunk_size=reads_per_batch,
                 n_jobs=n_jobs,
                 pre_dispatch=pre_dispatch,
                 confidence=confidence
             )
-            temp_reverse_predict = predict(
-                (r.reverse_complement()for r in reads_list),
+            reads_reverse_iter = DNAIterator(
+                skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
+            reverse_comp_predict = predict(
+                (r.reverse_complement() for r in reads_reverse_iter),
                 classifier,
                 chunk_size=reads_per_batch,
                 n_jobs=n_jobs,
                 pre_dispatch=pre_dispatch,
                 confidence=confidence
             )
-            seq_ids1, taxonomy1, confidence1 = list(zip(*temp_predict))
-            seq_ids2, taxonomy2, confidence2 = list(zip(*temp_reverse_predict))
+            seq_ids1, taxonomy1, confidence1 = list(zip(*same_predict))
+            seq_ids2, taxonomy2, confidence2 = list(zip(*reverse_comp_predict))
             seq_dict_1 = dict(zip(seq_ids1, zip(taxonomy1, confidence1)))
             seq_dict_2 = dict(zip(seq_ids2, zip(taxonomy2, confidence2)))
             df_result = pd.DataFrame()
@@ -262,8 +264,9 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                     result.index.name = 'Feature ID'
                     df_result = pd.concat([df_result, result])
             return df_result
+
         predictions = predict(
-            reads_list,
+            reads_iter,
             classifier,
             chunk_size=reads_per_batch,
             n_jobs=n_jobs,

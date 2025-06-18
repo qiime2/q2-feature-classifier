@@ -10,9 +10,6 @@ import json
 import os
 
 from unittest.mock import patch
-import numpy as np
-from sklearn.dummy import DummyClassifier
-from sklearn.pipeline import Pipeline
 from qiime2.sdk import Artifact
 from q2_types.feature_data import DNAIterator
 from qiime2.plugins import feature_classifier
@@ -304,40 +301,33 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
 
                 ]
 
-            X_fake = np.array([[0], [1]])
-            Y_fake = np.array(['a', 'b'])
-
-            mock_pipeline = Pipeline([('mock', DummyClassifier())])
-            mock_pipeline.fit(X_fake, Y_fake)
-            mock_classifier = Artifact.import_data('TaxonomicClassifier',
-                                                   mock_pipeline)
-
             classify = feature_classifier.methods.classify_sklearn
             seq_path = self.get_data_path('dna_sequence_both_test.fasta')
             reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
-            class_fwd = classify(reads, classifier=mock_classifier,
+            class_fwd = classify(reads, self.classifier,
                                  read_orientation='same')
-            class_rev = classify(reads, classifier=mock_classifier,
+            class_rev = classify(reads, self.classifier,
                                  read_orientation='reverse-complement')
-            class_both = classify(reads, classifier=mock_classifier,
+            class_both = classify(reads, self.classifier,
                                   read_orientation='both')
+
             fc_df = class_fwd.classification.view(pd.DataFrame)
             rc_df = class_rev.classification.view(pd.DataFrame)
+            bc_df = class_both.classification.view(pd.DataFrame)
             conf_fwd = float(fc_df.loc['DNA_SEQUENCE_1', 'Confidence'])
             conf_rev = float(rc_df.loc['DNA_SEQUENCE_1', 'Confidence'])
-            print(fc_df)
-            print(rc_df)
             self.assertGreater(conf_rev, conf_fwd)
-            bc_df = class_both.classification.view(pd.DataFrame)
-            print(bc_df)
+
             bc_tax_1 = bc_df.loc['DNA_SEQUENCE_1', 'Taxon']
             rc_tax_1 = rc_df.loc['DNA_SEQUENCE_1', 'Taxon']
             fc_tax_1 = fc_df.loc['DNA_SEQUENCE_1', 'Taxon']
             self.assertNotEqual(fc_tax_1, rc_tax_1)
             self.assertEqual(bc_tax_1, rc_tax_1)
+
             conf_fwd_2 = float(fc_df.loc['DNA_SEQUENCE_2', 'Confidence'])
             conf_rev_2 = float(rc_df.loc['DNA_SEQUENCE_2', 'Confidence'])
             self.assertGreater(conf_fwd_2, conf_rev_2)
+
             bc_tax_2 = bc_df.loc['DNA_SEQUENCE_2', 'Taxon']
             rc_tax_2 = rc_df.loc['DNA_SEQUENCE_2', 'Taxon']
             fc_tax_2 = fc_df.loc['DNA_SEQUENCE_2', 'Taxon']
