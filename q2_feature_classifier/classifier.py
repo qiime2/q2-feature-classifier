@@ -243,27 +243,61 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                 pre_dispatch=pre_dispatch,
                 confidence=confidence
             )
-            seq_ids1, taxonomy1, confidence1 = list(zip(*same_predict))
-            seq_ids2, taxonomy2, confidence2 = list(zip(*reverse_comp_predict))
-            seq_dict_1 = dict(zip(seq_ids1, zip(taxonomy1, confidence1)))
-            seq_dict_2 = dict(zip(seq_ids2, zip(taxonomy2, confidence2)))
-            df_result = pd.DataFrame()
-            for seq_id in seq_dict_1:
-                if seq_dict_1[seq_id][1] > seq_dict_2[seq_id][1]:
-                    result = pd.DataFrame(
-                        {'Taxon': [seq_dict_1[seq_id][0]],
-                         'Confidence': [seq_dict_1[seq_id][1]]},
-                        index=[seq_id], columns=['Taxon', 'Confidence'])
-                    result.index.name = 'Feature ID'
-                    df_result = pd.concat([df_result, result])
+            seq_ids_same, taxonomy_same, confidence_same = list(zip(
+                *same_predict))
+            seq_ids_rc, taxonomy_rc, confidence_rc = list(zip(
+                *reverse_comp_predict))
+
+            data_frame_forward = pd.DataFrame(
+                {'Forward Taxon': taxonomy_same,
+                 'Forward Confidence': confidence_same,
+                 'Feature ID': seq_ids_same}
+            )
+
+            data_frame_rc = pd.DataFrame(
+                {'Reverse Taxon': taxonomy_rc,
+                 'Reverse Confidence': confidence_rc,
+                 'Feature ID': seq_ids_rc}
+            )
+
+            result = pd.merge(
+                data_frame_forward,
+                data_frame_rc,
+                on='Feature ID'
+            )
+
+            def choose_confidence(row):
+                if row['Forward Confidence'] > row['Reverse Confidence']:
+                    return row['Forward Confidence']
                 else:
-                    result = pd.DataFrame(
-                        {'Taxon': [seq_dict_2[seq_id][0]],
-                         'Confidence': [seq_dict_2[seq_id][1]]},
-                        index=[seq_id], columns=['Taxon', 'Confidence'])
-                    result.index.name = 'Feature ID'
-                    df_result = pd.concat([df_result, result])
-            return df_result
+                    return row['Reverse Confidence']
+
+            result["Confidence Final"] = result.apply(choose_confidence,
+                                                      axis=1)
+
+            def choose_taxonomy(row):
+                if row['Forward Confidence'] > row['Reverse Confidence']:
+                    return row['Forward Taxon']
+                else:
+                    return row['Reverse Taxon']
+
+            result['Taxon Final'] = result.apply(choose_taxonomy, axis=1)
+
+            result.drop(['Forward Confidence', 'Reverse Confidence',
+                        'Forward Taxon', 'Reverse Taxon'], axis=1,
+                        inplace=True)
+
+            result.rename(columns={'Taxon Final': 'Taxon',
+                                   'Confidence Final': 'Confidence'},
+                          inplace=True
+                          )
+
+            result = result[['Taxon', 'Confidence', 'Feature ID']]
+
+            result.set_index('Feature ID', inplace=True)
+            result.index.name = 'Feature ID'
+
+            return result
 
         predictions = predict(
             reads_iter,
