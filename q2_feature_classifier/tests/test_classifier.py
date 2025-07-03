@@ -354,7 +354,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         class_rev = classify(
             reads, self.classifier, read_orientation='reverse-complement'
         )
-        class_both = classify(reads, self.classifier)
+        class_both = classify(reads, self.classifier, read_orientation='both')
 
         both_df = class_fwd.classification.view(pd.DataFrame)
         rev_df = class_rev.classification.view(pd.DataFrame)

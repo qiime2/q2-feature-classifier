@@ -207,7 +207,7 @@ def _autotune_reads_per_batch(reads, n_jobs):
 def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                      reads_per_batch: int = 'auto', n_jobs: int = 1,
                      pre_dispatch: str = '2*n_jobs', confidence: float = 0.7,
-                     read_orientation: str = 'both'
+                     read_orientation: str = 'auto'
                      ) -> pd.DataFrame:
 
     if n_jobs == 0:
