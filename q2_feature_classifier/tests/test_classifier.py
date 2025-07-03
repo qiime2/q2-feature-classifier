@@ -371,3 +371,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             self.assertTrue(
                 both_df.loc[feature, 'Taxon'], higher_df.loc[feature, 'Taxon']
             )
+            self.assertTrue(
+                both_df.loc[feature, 'Confidence'],
+                higher_df.loc[feature, 'Confidence']
+            )
