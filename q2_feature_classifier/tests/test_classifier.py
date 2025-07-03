@@ -284,7 +284,14 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         self.assertEqual(tree.children['a'].children['b'].num_leaf_nodes, 2)
         self.assertEqual(tree.children['a'].children['e'].num_leaf_nodes, 2)
 
-    def test_both_orientations(self):
+    def test_both_orientations_patched_data(self):
+        """
+        This function tests the functionality of the `both` orientation
+        option for `classify_sklearn` by using patched data and asserting that
+        the `both` data frame always contains the classifications with higher
+        confidence.
+        """
+
         with patch('q2_feature_classifier.classifier.predict') as mock_predict:
             mock_predict.side_effect = [
                 [('DNA_SEQUENCE_1', 'k__Bacteria, p__A', 0.6),
@@ -333,7 +340,12 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             self.assertNotEqual(rc_tax_2, fc_tax_2)
             self.assertEqual(bc_tax_2, fc_tax_2)
 
-    def test_both_orientation_two(self):
+    def test_both_orientation_real_data(self):
+        """
+        This tests the functionality of the `both` orientation option for
+        `classify_sklearn` by asserting that the `both` data frame always
+        contains the classification with higher confidence.
+        """
         classify = feature_classifier.methods.classify_sklearn
         sequence_path = self.get_data_path('moving-pictures-rep-seqs.fasta')
         reads = Artifact.import_data('FeatureData[Sequence]', sequence_path)
@@ -357,5 +369,5 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             else:
                 higher_df = rev_df
             self.assertTrue(
-                both_df.loc[feature,'Taxon'], higher_df.loc[feature,'Taxon']
+                both_df.loc[feature, 'Taxon'], higher_df.loc[feature, 'Taxon']
             )
