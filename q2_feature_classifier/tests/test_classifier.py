@@ -340,7 +340,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             self.assertNotEqual(rc_tax_2, fc_tax_2)
             self.assertEqual(bc_tax_2, fc_tax_2)
 
-    def test_both_orientation_real_data(self):
+    def test_both_orientations_real_data(self):
         """
         This tests the functionality of the `both` orientation option for
         `classify_sklearn` by asserting that the `both` data frame always
@@ -368,10 +368,11 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
                 higher_df = fwd_df
             else:
                 higher_df = rev_df
-            self.assertTrue(
+
+            self.assertEqual(
                 both_df.loc[feature, 'Taxon'], higher_df.loc[feature, 'Taxon']
             )
-            self.assertTrue(
+            self.assertEqual(
                 both_df.loc[feature, 'Confidence'],
                 higher_df.loc[feature, 'Confidence']
             )
