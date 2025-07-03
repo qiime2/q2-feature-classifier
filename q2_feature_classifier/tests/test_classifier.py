@@ -356,9 +356,9 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         )
         class_both = classify(reads, self.classifier, read_orientation='both')
 
-        both_df = class_fwd.classification.view(pd.DataFrame)
+        fwd_df = class_fwd.classification.view(pd.DataFrame)
         rev_df = class_rev.classification.view(pd.DataFrame)
-        fwd_df = class_both.classification.view(pd.DataFrame)
+        both_df = class_both.classification.view(pd.DataFrame)
 
         for feature in both_df.index:
             if (
