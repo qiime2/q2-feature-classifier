@@ -298,8 +298,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
 
                 [('DNA_SEQUENCE_1', 'k__Bacteria, p__A', 0.6),
                  ('DNA_SEQUENCE_2', 'k__Bacteria, p__B', 0.9)]
-
-                ]
+            ]
 
             classify = feature_classifier.methods.classify_sklearn
             seq_path = self.get_data_path('dna_sequence_both_test.fasta')
@@ -333,3 +332,30 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             fc_tax_2 = fc_df.loc['DNA_SEQUENCE_2', 'Taxon']
             self.assertNotEqual(rc_tax_2, fc_tax_2)
             self.assertEqual(bc_tax_2, fc_tax_2)
+
+    def test_both_orientation_two(self):
+        classify = feature_classifier.methods.classify_sklearn
+        sequence_path = self.get_data_path('moving-pictures-rep-seqs.fasta')
+        reads = Artifact.import_data('FeatureData[Sequence]', sequence_path)
+
+        class_fwd = classify(reads, self.classifier, read_orientation='same')
+        class_rev = classify(
+            reads, self.classifier, read_orientation='reverse-complement'
+        )
+        class_both = classify(reads, self.classifier)
+
+        both_df = class_fwd.classification.view(pd.DataFrame)
+        rev_df = class_rev.classification.view(pd.DataFrame)
+        fwd_df = class_both.classification.view(pd.DataFrame)
+
+        for feature in both_df.index:
+            if (
+                fwd_df.loc[feature, 'Confidence'] >=
+                rev_df.loc[feature, 'Confidence']
+            ):
+                higher_df = fwd_df
+            else:
+                higher_df = rev_df
+            self.assertTrue(
+                both_df.loc[feature,'Taxon'], higher_df.loc[feature,'Taxon']
+            )

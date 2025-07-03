@@ -267,7 +267,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
             )
 
             def choose_confidence(row):
-                if row['Forward Confidence'] > row['Reverse Confidence']:
+                if row['Forward Confidence'] >= row['Reverse Confidence']:
                     return row['Forward Confidence']
                 else:
                     return row['Reverse Confidence']
@@ -276,7 +276,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                                                       axis=1)
 
             def choose_taxonomy(row):
-                if row['Forward Confidence'] > row['Reverse Confidence']:
+                if row['Forward Confidence'] >= row['Reverse Confidence']:
                     return row['Forward Taxon']
                 else:
                     return row['Reverse Taxon']
