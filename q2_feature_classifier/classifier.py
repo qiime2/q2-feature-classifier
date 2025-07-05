@@ -261,9 +261,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
             )
 
             result = pd.merge(
-                data_frame_forward,
-                data_frame_rc,
-                on='Feature ID'
+                data_frame_forward, data_frame_rc, on='Feature ID'
             )
 
             def choose_confidence(row):
@@ -272,28 +270,24 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                 else:
                     return row['Reverse Confidence']
 
-            result["Confidence Final"] = result.apply(choose_confidence,
-                                                      axis=1)
-
             def choose_taxonomy(row):
                 if row['Forward Confidence'] >= row['Reverse Confidence']:
                     return row['Forward Taxon']
                 else:
                     return row['Reverse Taxon']
 
+            result["Confidence Final"] = result.apply(
+                choose_confidence, axis=1
+            )
             result['Taxon Final'] = result.apply(choose_taxonomy, axis=1)
 
-            result.drop(['Forward Confidence', 'Reverse Confidence',
-                        'Forward Taxon', 'Reverse Taxon'], axis=1,
-                        inplace=True)
-
-            result.rename(columns={'Taxon Final': 'Taxon',
-                                   'Confidence Final': 'Confidence'},
-                          inplace=True
-                          )
-
+            result.rename(
+                columns={
+                    'Taxon Final': 'Taxon', 'Confidence Final': 'Confidence'
+                },
+                inplace=True
+            )
             result = result[['Taxon', 'Confidence', 'Feature ID']]
-
             result.set_index('Feature ID', inplace=True)
             result.index.name = 'Feature ID'
 
@@ -345,8 +339,8 @@ _parameter_descriptions = {
                         'and complemented prior to classification. '
                         'Both will classify sequences unchanged and in '
                         'reverse-complement and retain the '
-                        'classification with higher confidence.'
-                        '"auto" will autodetect orientation based on the '
+                        'classification with higher confidence. '
+                        'auto will autodetect orientation based on the '
                         'confidence estimates for the first 100 reads.',
     'reads_per_batch': 'Number of reads to process in each batch. If "auto", '
                        'this parameter is autoscaled to '

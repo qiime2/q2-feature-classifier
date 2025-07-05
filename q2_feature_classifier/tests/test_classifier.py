@@ -291,7 +291,6 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         the `both` data frame always contains the classifications with higher
         confidence.
         """
-
         with patch('q2_feature_classifier.classifier.predict') as mock_predict:
             mock_predict.side_effect = [
                 [('DNA_SEQUENCE_1', 'k__Bacteria, p__A', 0.6),
