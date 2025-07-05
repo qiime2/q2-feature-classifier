@@ -9,6 +9,7 @@
 import json
 import os
 
+from unittest.mock import patch
 from qiime2.sdk import Artifact
 from q2_types.feature_data import DNAIterator
 from qiime2.plugins import feature_classifier
@@ -19,7 +20,6 @@ import biom
 from q2_feature_classifier._skl import _specific_fitters, _TaxonNode
 from q2_feature_classifier.classifier import spec_from_pipeline, \
     pipeline_from_spec, populate_class_weight, _autotune_reads_per_batch
-
 from . import FeatureClassifierTestPluginBase
 
 
@@ -182,13 +182,15 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
                        'fasta', rev_path)
         rev_reads = Artifact.import_data('FeatureData[Sequence]', rev_path)
 
-        result = classify(reads, self.classifier)
+        result = classify(reads, self.classifier,
+                          read_orientation='auto')
         fc = result.classification.view(pd.Series).to_dict()
-        result = classify(rev_reads, self.classifier)
+        result = classify(rev_reads, self.classifier,
+                          read_orientation='auto')
         rc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
-            self.assertEqual(fc[taxon], rc[taxon])
+            self.assertEqual(rc[taxon], fc[taxon])
 
         result = classify(reads, self.classifier, read_orientation='same')
         fc = result.classification.view(pd.Series).to_dict()
@@ -200,7 +202,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
             self.assertEqual(fc[taxon], rc[taxon])
 
         result = classify(reads, self.classifier, reads_per_batch=100,
-                          n_jobs=2)
+                          n_jobs=2, read_orientation='auto')
         cc = result.classification.view(pd.Series).to_dict()
 
         for taxon in fc:
@@ -281,3 +283,95 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         self.assertEqual(tree.children['a'].num_leaf_nodes, 4)
         self.assertEqual(tree.children['a'].children['b'].num_leaf_nodes, 2)
         self.assertEqual(tree.children['a'].children['e'].num_leaf_nodes, 2)
+
+    def test_both_orientations_patched_data(self):
+        """
+        This function tests the functionality of the `both` orientation
+        option for `classify_sklearn` by using patched data and asserting that
+        the `both` data frame always contains the classifications with higher
+        confidence.
+        """
+        with patch('q2_feature_classifier.classifier.predict') as mock_predict:
+            mock_predict.side_effect = [
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__A', 0.6),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__B', 0.9)],
+
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__C', 0.9),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__D', 0.6)],
+
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__C', 0.9),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__D', 0.6)],
+
+                [('DNA_SEQUENCE_1', 'k__Bacteria, p__A', 0.6),
+                 ('DNA_SEQUENCE_2', 'k__Bacteria, p__B', 0.9)]
+            ]
+
+            classify = feature_classifier.methods.classify_sklearn
+            seq_path = self.get_data_path('dna_sequence_both_test.fasta')
+            reads = Artifact.import_data('FeatureData[Sequence]', seq_path)
+            class_fwd = classify(reads, self.classifier,
+                                 read_orientation='same')
+            class_rev = classify(reads, self.classifier,
+                                 read_orientation='reverse-complement')
+            class_both = classify(reads, self.classifier,
+                                  read_orientation='both')
+
+            fc_df = class_fwd.classification.view(pd.DataFrame)
+            rc_df = class_rev.classification.view(pd.DataFrame)
+            bc_df = class_both.classification.view(pd.DataFrame)
+            conf_fwd = float(fc_df.loc['DNA_SEQUENCE_1', 'Confidence'])
+            conf_rev = float(rc_df.loc['DNA_SEQUENCE_1', 'Confidence'])
+            self.assertGreater(conf_rev, conf_fwd)
+
+            bc_tax_1 = bc_df.loc['DNA_SEQUENCE_1', 'Taxon']
+            rc_tax_1 = rc_df.loc['DNA_SEQUENCE_1', 'Taxon']
+            fc_tax_1 = fc_df.loc['DNA_SEQUENCE_1', 'Taxon']
+            self.assertNotEqual(fc_tax_1, rc_tax_1)
+            self.assertEqual(bc_tax_1, rc_tax_1)
+
+            conf_fwd_2 = float(fc_df.loc['DNA_SEQUENCE_2', 'Confidence'])
+            conf_rev_2 = float(rc_df.loc['DNA_SEQUENCE_2', 'Confidence'])
+            self.assertGreater(conf_fwd_2, conf_rev_2)
+
+            bc_tax_2 = bc_df.loc['DNA_SEQUENCE_2', 'Taxon']
+            rc_tax_2 = rc_df.loc['DNA_SEQUENCE_2', 'Taxon']
+            fc_tax_2 = fc_df.loc['DNA_SEQUENCE_2', 'Taxon']
+            self.assertNotEqual(rc_tax_2, fc_tax_2)
+            self.assertEqual(bc_tax_2, fc_tax_2)
+
+    def test_both_orientations_real_data(self):
+        """
+        This tests the functionality of the `both` orientation option for
+        `classify_sklearn` by asserting that the `both` data frame always
+        contains the classification with higher confidence.
+        """
+        classify = feature_classifier.methods.classify_sklearn
+        sequence_path = self.get_data_path('moving-pictures-rep-seqs.fasta')
+        reads = Artifact.import_data('FeatureData[Sequence]', sequence_path)
+
+        class_fwd = classify(reads, self.classifier, read_orientation='same')
+        class_rev = classify(
+            reads, self.classifier, read_orientation='reverse-complement'
+        )
+        class_both = classify(reads, self.classifier, read_orientation='both')
+
+        fwd_df = class_fwd.classification.view(pd.DataFrame)
+        rev_df = class_rev.classification.view(pd.DataFrame)
+        both_df = class_both.classification.view(pd.DataFrame)
+
+        for feature in both_df.index:
+            if (
+                fwd_df.loc[feature, 'Confidence'] >=
+                rev_df.loc[feature, 'Confidence']
+            ):
+                higher_df = fwd_df
+            else:
+                higher_df = rev_df
+
+            self.assertEqual(
+                both_df.loc[feature, 'Taxon'], higher_df.loc[feature, 'Taxon']
+            )
+            self.assertEqual(
+                both_df.loc[feature, 'Confidence'],
+                higher_df.loc[feature, 'Confidence']
+            )

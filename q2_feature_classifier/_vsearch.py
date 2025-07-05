@@ -394,7 +394,11 @@ plugin.pipelines.register_function(
                             'same will cause reads to be classified unchanged'
                             '; reverse-complement will cause reads to be '
                             'reversed and complemented prior to '
-                            'classification. "auto" will autodetect '
+                            'classification. Both will classify sequences '
+                            'unchanged and in '
+                            'reverse-complement and retain the '
+                            'classification with higher confidence.'
+                            '"auto" will autodetect '
                             'orientation based on the confidence estimates '
                             'for the first 100 reads.',
         'reads_per_batch': 'Number of reads to process in each batch for '

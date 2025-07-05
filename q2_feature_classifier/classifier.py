@@ -170,6 +170,8 @@ def _autodetect_orientation(reads, classifier, n=100,
         return reads
     if read_orientation == 'reverse-complement':
         return (r.reverse_complement() for r in reads)
+    if read_orientation == 'both':
+        return reads
     first_n_reads = list(islice(reads, n))
     result = list(zip(*predict(first_n_reads, classifier, confidence=0.)))
     _, _, same_confidence = result
@@ -217,14 +219,88 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
             reads_per_batch = _autotune_reads_per_batch(reads, n_jobs)
 
         # transform reads to DNAIterator
-        reads = DNAIterator(
+        reads_iter = DNAIterator(
             skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
+        reads_iter = _autodetect_orientation(
+            reads_iter, classifier, read_orientation=read_orientation)
 
-        reads = _autodetect_orientation(
-            reads, classifier, read_orientation=read_orientation)
-        predictions = predict(reads, classifier, chunk_size=reads_per_batch,
-                              n_jobs=n_jobs, pre_dispatch=pre_dispatch,
-                              confidence=confidence)
+        if read_orientation == 'both':
+            same_predict = predict(
+                reads_iter,
+                classifier,
+                chunk_size=reads_per_batch,
+                n_jobs=n_jobs,
+                pre_dispatch=pre_dispatch,
+                confidence=confidence
+            )
+            reads_reverse_iter = DNAIterator(
+                skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
+            reverse_comp_predict = predict(
+                (r.reverse_complement() for r in reads_reverse_iter),
+                classifier,
+                chunk_size=reads_per_batch,
+                n_jobs=n_jobs,
+                pre_dispatch=pre_dispatch,
+                confidence=confidence
+            )
+            seq_ids_same, taxonomy_same, confidence_same = list(zip(
+                *same_predict))
+            seq_ids_rc, taxonomy_rc, confidence_rc = list(zip(
+                *reverse_comp_predict))
+
+            data_frame_forward = pd.DataFrame(
+                {'Forward Taxon': taxonomy_same,
+                 'Forward Confidence': confidence_same,
+                 'Feature ID': seq_ids_same}
+            )
+
+            data_frame_rc = pd.DataFrame(
+                {'Reverse Taxon': taxonomy_rc,
+                 'Reverse Confidence': confidence_rc,
+                 'Feature ID': seq_ids_rc}
+            )
+
+            result = pd.merge(
+                data_frame_forward, data_frame_rc, on='Feature ID'
+            )
+
+            def choose_confidence(row):
+                if row['Forward Confidence'] >= row['Reverse Confidence']:
+                    return row['Forward Confidence']
+                else:
+                    return row['Reverse Confidence']
+
+            def choose_taxonomy(row):
+                if row['Forward Confidence'] >= row['Reverse Confidence']:
+                    return row['Forward Taxon']
+                else:
+                    return row['Reverse Taxon']
+
+            result["Confidence Final"] = result.apply(
+                choose_confidence, axis=1
+            )
+            result['Taxon Final'] = result.apply(choose_taxonomy, axis=1)
+
+            result.rename(
+                columns={
+                    'Taxon Final': 'Taxon', 'Confidence Final': 'Confidence'
+                },
+                inplace=True
+            )
+            result = result[['Taxon', 'Confidence', 'Feature ID']]
+            result.set_index('Feature ID', inplace=True)
+            result.index.name = 'Feature ID'
+
+            return result
+
+        predictions = predict(
+            reads_iter,
+            classifier,
+            chunk_size=reads_per_batch,
+            n_jobs=n_jobs,
+            pre_dispatch=pre_dispatch,
+            confidence=confidence
+        )
         seq_ids, taxonomy, confidence = list(zip(*predictions))
 
         result = pd.DataFrame({'Taxon': taxonomy, 'Confidence': confidence},
@@ -247,7 +323,8 @@ _classify_parameters = {
     'confidence': Float % Range(
         0, 1, inclusive_start=True, inclusive_end=True) | Str % Choices(
             ['disable']),
-    'read_orientation': Str % Choices(['same', 'reverse-complement', 'auto'])}
+    'read_orientation': Str % Choices(['same', 'reverse-complement', 'auto',
+                                      'both'])}
 
 _parameter_descriptions = {
     'confidence': 'Confidence threshold for limiting '
@@ -260,7 +337,10 @@ _parameter_descriptions = {
                         'reads to be classified unchanged; reverse-'
                         'complement will cause reads to be reversed '
                         'and complemented prior to classification. '
-                        '"auto" will autodetect orientation based on the '
+                        'Both will classify sequences unchanged and in '
+                        'reverse-complement and retain the '
+                        'classification with higher confidence. '
+                        'auto will autodetect orientation based on the '
                         'confidence estimates for the first 100 reads.',
     'reads_per_batch': 'Number of reads to process in each batch. If "auto", '
                        'this parameter is autoscaled to '
