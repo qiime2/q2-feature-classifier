@@ -37,54 +37,6 @@ def _primers_to_regex(f_primer, r_primer):
                                _seq_to_regex(r_primer.reverse_complement()))
 
 
-def _local_aln(primer, sequence):
-    best_score = None
-    for one_primer in sorted([str(s) for s in primer.expand_degenerates()]):
-        # `sequence` may contain degenerates. These will usually be N
-        # characters, which SSW will score as zero. Although undocumented, SSW
-        # will treat other degenerate characters as a mismatch. We acknowledge
-        # that this approach is a heuristic to finding an optimal alignment and
-        # may be revisited in the future if there's an aligner that explicitly
-        # handles degenerates.
-        this_aln = \
-            skbio.alignment.local_pairwise_align_ssw(skbio.DNA(one_primer),
-                                                     sequence)
-        score = this_aln[1]
-        if best_score is None or score > best_score:
-            best_score = score
-            best_aln = this_aln
-    return best_aln
-
-
-def _semisemiglobal(primer, sequence, reverse=False):
-    if reverse:
-        primer = primer.reverse_complement()
-
-    # locally align the primer
-    (aln_prim, aln_seq), score, (prim_pos, seq_pos) = \
-        _local_aln(primer, sequence)
-    amplicon_pos = seq_pos[1]+len(primer)-prim_pos[1]
-
-    # naively extend the alignment to be semi-global
-    bits = [primer[:prim_pos[0]], aln_prim, primer[prim_pos[1]+1:]]
-    aln_prim = ''.join(map(str, bits))
-    bits = ['-'*(prim_pos[0]-seq_pos[0]),
-            sequence[max(seq_pos[0]-prim_pos[0], 0):seq_pos[0]],
-            aln_seq,
-            sequence[seq_pos[1]+1:amplicon_pos],
-            '-'*(amplicon_pos-len(sequence))]
-    aln_seq = ''.join(map(str, bits))
-
-    # count the matches
-    matches = sum(s in skbio.DNA.degenerate_map.get(p, {p})
-                  for p, s in zip(aln_prim, aln_seq))
-
-    if reverse:
-        amplicon_pos = max(seq_pos[0]-prim_pos[0], 0)
-
-    return amplicon_pos, matches, len(aln_prim)
-
-
 def _exact_match(seq, f_primer, r_primer):
     try:
         regex = _primers_to_regex(f_primer, r_primer)
@@ -95,12 +47,59 @@ def _exact_match(seq, f_primer, r_primer):
         return None
 
 
+def _primer_hit(primer, seq, reverse=False):
+    if reverse:
+        primer = primer.reverse_complement()
+    best_score = None
+    for p in sorted([str(s) for s in primer.expand_degenerates()]):
+        p = skbio.DNA(p)
+        try:
+            # perform pairwise semi-global alignment, such that gaps on the
+            # ends of primer aren't scored but gaps on the ends of seq are
+            # scored
+            aln = skbio.alignment.pair_align_nucl(
+                p, seq, mode='global',
+                free_ends=[True, True, False, False], trim_ends=True)
+            score = aln.score
+            if best_score is None or score > best_score:
+                best_score = score
+                best_aln = aln
+                best_primer = p
+        except IndexError:
+            # this is currently necessary as it seems that if all positions
+            # are "ends" then `skbio.alignment.pair_align_nucl` fails with
+            # an IndexError (e.g., rather than returning an alignment with a
+            # shape of (2, 0)).
+            # See https://github.com/scikit-bio/scikit-bio/issues/2279
+            # This should be removed when that issue is addressed as we are
+            # assuming an IndexError means a very poor alignment but we may be
+            # masking other IndexErrors.
+            best_score = 0.0
+    if best_score == 0.0:
+        return None, 0, len(primer)
+    msa = skbio.TabularMSA.from_path_seqs(best_aln.paths[0],
+                                          (best_primer, seq))
+
+    if reverse:
+        amplicon_pos = best_aln.paths[0].starts[1]
+    else:
+        amplicon_pos = best_aln.paths[0].stops[1]
+
+    n_matches = msa[0].match_frequency(msa[1])
+    aligned_length = msa.shape[1]
+
+    return amplicon_pos, n_matches, aligned_length
+
+
 def _approx_match(seq, f_primer, r_primer, identity):
-    beg, b_matches, b_length = _semisemiglobal(f_primer, seq)
-    end, e_matches, e_length = _semisemiglobal(r_primer, seq, reverse=True)
-    if (b_matches + e_matches) / (b_length + e_length) >= identity:
-        return seq[beg:end]
-    return None
+    amp_start, f_matches, f_length = _primer_hit(f_primer, seq)
+    amp_end, r_matches, r_length = _primer_hit(r_primer, seq, reverse=True)
+    if f_matches == 0 or f_matches == 0:
+        return None
+    elif f_matches / f_length >= identity and r_matches / r_length >= identity:
+        return seq[amp_start:amp_end]
+    else:
+        return None
 
 
 def _gen_reads(sequence, f_primer, r_primer, trim_right, trunc_len, trim_left,
