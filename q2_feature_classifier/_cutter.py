@@ -47,7 +47,7 @@ def _exact_match(seq, f_primer, r_primer):
         return None
 
 
-def _primer_hit(primer, seq, reverse=False):
+def _align_primer(primer, seq, reverse=False):
     if reverse:
         primer = primer.reverse_complement()
     best_score = None
@@ -92,9 +92,9 @@ def _primer_hit(primer, seq, reverse=False):
 
 
 def _approx_match(seq, f_primer, r_primer, identity):
-    amp_start, f_matches, f_length = _primer_hit(f_primer, seq)
-    amp_end, r_matches, r_length = _primer_hit(r_primer, seq, reverse=True)
-    if f_matches == 0 or f_matches == 0:
+    amp_start, f_matches, f_length = _align_primer(f_primer, seq)
+    amp_end, r_matches, r_length = _align_primer(r_primer, seq, reverse=True)
+    if f_matches == 0 or r_matches == 0:
         return None
     elif f_matches / f_length >= identity and r_matches / r_length >= identity:
         return seq[amp_start:amp_end]
