@@ -36,11 +36,12 @@ test:
   - q2-taxa >={{ q2_taxa }}
   - q2-feature-table >={{ q2_feature_table }}
   - pytest
+  - pytest-xdist
   imports:
   - q2_feature_classifier
   - qiime2.plugins.feature_classifier
   commands:
-  - py.test --pyargs q2_feature_classifier
+  - py.test --pyargs q2_feature_classifier -n auto
 about:
   home: https://qiime2.org
   license: BSD-3-Clause
