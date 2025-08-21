@@ -80,15 +80,15 @@ def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
                         sm[(row, col)] = match
                     else:
                         sm[(row, col)] = mismatch
-                else:
-                    # degenerate char in query sequence is always a mismatch
+                else:  # degenerate char in query sequence is always a mismatch
                     sm[(row, col)] = mismatch
-            else: # primer character is degenerate
+            else:  # primer character is degenerate
                 if c2 in skbio.DNA.degenerate_map[c1]:
                     sm[(row, col)] = match
                 else:
                     sm[(row, col)] = mismatch
     return skbio.SubstitutionMatrix(chars, sm)
+
 
 def _match_percent(primer, target):
     """ Compute percent of matching positions in alignments, accounting for
@@ -128,7 +128,6 @@ def _align_primer(primer, target, substitution_matrix, reverse=False):
         amplicon_pos = aln.paths[0].starts[1]
     else:
         amplicon_pos = aln.paths[0].stops[1]
-
 
     return amplicon_pos, match_percent
 
