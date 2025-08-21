@@ -50,40 +50,34 @@ def _exact_match(seq, f_primer, r_primer):
 def _align_primer(primer, seq, reverse=False):
     if reverse:
         primer = primer.reverse_complement()
-    best_score = None
-    for p in sorted([str(s) for s in primer.expand_degenerates()]):
-        p = skbio.DNA(p)
-        try:
-            # perform pairwise semi-global alignment, such that gaps on the
-            # ends of primer aren't scored but gaps on the ends of seq are
-            # scored
-            aln = skbio.alignment.pair_align_nucl(
-                p, seq, mode='global',
-                free_ends=[True, True, False, False], trim_ends=True)
-            score = aln.score
-            if best_score is None or score > best_score:
-                best_score = score
-                best_aln = aln
-                best_primer = p
-        except IndexError:
-            # this is currently necessary as it seems that if all positions
-            # are "ends" then `skbio.alignment.pair_align_nucl` fails with
-            # an IndexError (e.g., rather than returning an alignment with a
-            # shape of (2, 0)).
-            # See https://github.com/scikit-bio/scikit-bio/issues/2279
-            # This should be removed when that issue is addressed as we are
-            # assuming an IndexError means a very poor alignment but we may be
-            # masking other IndexErrors.
-            best_score = 0.0
-    if best_score == 0.0:
+
+    # perform pairwise semi-global alignment, such that gaps on the
+    # ends of primer aren't scored but gaps on the ends of seq are
+    # scored. NUC.4.4 is a substitution matrix that accounts for degenerate
+    # nucleotide characters
+    try:
+        aln = skbio.alignment.pair_align_nucl(
+            primer, seq, mode='global', sub_score='NUC.4.4',
+            free_ends=[True, True, False, False], trim_ends=True)
+        score = aln.score
+    except IndexError:
+        # this is currently necessary as it seems that if all positions
+        # are "ends" then `skbio.alignment.pair_align_nucl` fails with
+        # an IndexError (e.g., rather than returning an alignment with a
+        # shape of (2, 0)).
+        # See https://github.com/scikit-bio/scikit-bio/issues/2279
+        # This should be removed when that issue is addressed as we are
+        # assuming an IndexError means a very poor alignment but we may be
+        # masking other IndexErrors.
+        score = 0.0
+    if score == 0.0:
         return None, 0, len(primer)
-    msa = skbio.TabularMSA.from_path_seqs(best_aln.paths[0],
-                                          (best_primer, seq))
+    msa = skbio.TabularMSA.from_path_seqs(aln.paths[0], (primer, seq))
 
     if reverse:
-        amplicon_pos = best_aln.paths[0].starts[1]
+        amplicon_pos = aln.paths[0].starts[1]
     else:
-        amplicon_pos = best_aln.paths[0].stops[1]
+        amplicon_pos = aln.paths[0].stops[1]
 
     n_matches = msa[0].match_frequency(msa[1])
     aligned_length = msa.shape[1]
