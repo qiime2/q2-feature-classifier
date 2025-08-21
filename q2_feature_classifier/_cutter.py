@@ -55,23 +55,10 @@ def _align_primer(primer, seq, reverse=False):
     # ends of primer aren't scored but gaps on the ends of seq are
     # scored. NUC.4.4 is a substitution matrix that accounts for degenerate
     # nucleotide characters
-    try:
-        aln = skbio.alignment.pair_align_nucl(
-            primer, seq, mode='global', sub_score='NUC.4.4',
-            free_ends=[True, True, False, False], trim_ends=True)
-        score = aln.score
-    except IndexError:
-        # this is currently necessary as it seems that if all positions
-        # are "ends" then `skbio.alignment.pair_align_nucl` fails with
-        # an IndexError (e.g., rather than returning an alignment with a
-        # shape of (2, 0)).
-        # See https://github.com/scikit-bio/scikit-bio/issues/2279
-        # This should be removed when that issue is addressed as we are
-        # assuming an IndexError means a very poor alignment but we may be
-        # masking other IndexErrors.
-        score = 0.0
-    if score == 0.0:
-        return None, 0, len(primer)
+    aln = skbio.alignment.pair_align_nucl(
+        primer, seq, mode='global', sub_score='NUC.4.4',
+        free_ends=[True, True, False, False], trim_ends=True)
+    score = aln.score
     msa = skbio.TabularMSA.from_path_seqs(aln.paths[0], (primer, seq))
 
     if reverse:
@@ -79,6 +66,13 @@ def _align_primer(primer, seq, reverse=False):
     else:
         amplicon_pos = aln.paths[0].stops[1]
 
+    # this computation of matches doesn't account for degenerate characters -
+    # they are scored as mismatches, unless the same degenerate character is
+    # present at the same position in both sequences. so, for example, this
+    # alignment would have 2 matches (the first two positions) and two
+    # mismatches. this seems less than ideal.
+    # CNNC
+    # CNCN
     n_matches = msa[0].match_frequency(msa[1])
     aligned_length = msa.shape[1]
 
