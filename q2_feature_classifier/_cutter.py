@@ -8,6 +8,7 @@
 
 import skbio
 import os
+import numpy as np
 from joblib import Parallel, delayed, effective_n_jobs
 
 from qiime2.plugin import Int, Str, Float, Range, Choices
@@ -47,44 +48,98 @@ def _exact_match(seq, f_primer, r_primer):
         return None
 
 
-def _align_primer(primer, seq, reverse=False):
+def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
+    """ Create an asymmetric substitution matrix for matching degenerate
+        primers to target sequences
+
+        This is asymmetic such that degenerate characters in primers will
+        score as matches when the target sequences contains a relevant
+        character. Degenerate characters in target sequences however always
+        score as a mismatch.
+
+        This is designed on the assumption that primers contain degenerate
+        characters because they represent a pool of sequences that will
+        actually be present in a PCR reaction, but degenerate characters in
+        target sequences represent error or uncertainty.
+
+        This is intended for use with `skbio.alignment.pair_align`, and the
+        primer should be passed as the first sequence and the target as the
+        second sequence.
+    """
+    definite_chars = sorted(skbio.DNA.definite_chars)
+    degenerate_chars = sorted(skbio.DNA.degenerate_chars)
+    chars = definite_chars + degenerate_chars
+
+    sm = np.zeros((len(chars), len(chars)))
+
+    for row, c1 in enumerate(chars):
+        for col, c2 in enumerate(chars):
+            if c1 in definite_chars:
+                if c2 in definite_chars:
+                    if c1 == c2:
+                        sm[(row, col)] = match
+                    else:
+                        sm[(row, col)] = mismatch
+                else:
+                    # degenerate char in query sequence is always a mismatch
+                    sm[(row, col)] = mismatch
+            else: # primer character is degenerate
+                if c2 in skbio.DNA.degenerate_map[c1]:
+                    sm[(row, col)] = match
+                else:
+                    sm[(row, col)] = mismatch
+    return skbio.SubstitutionMatrix(chars, sm)
+
+def _match_percent(primer, target):
+    """ Compute percent of matching positions in alignments, accounting for
+        primer degeneracies
+    """
+    matches = 0
+    for primer_c, target_c in zip(str(primer), str(target)):
+        if target_c in skbio.DNA.degenerate_chars:
+            continue
+        if primer_c == target_c:
+            matches += 1
+        elif (primer_c in skbio.DNA.degenerate_chars and
+              target_c in skbio.DNA.degenerate_map[primer_c]):
+            matches += 1
+        else:
+            continue
+    return matches / len(primer)
+
+
+def _align_primer(primer, target, substitution_matrix, reverse=False):
     if reverse:
         primer = primer.reverse_complement()
 
     # perform pairwise semi-global alignment, such that gaps on the
-    # ends of primer aren't scored but gaps on the ends of seq are
-    # scored. NUC.4.4 is a substitution matrix that accounts for degenerate
-    # nucleotide characters
+    # ends of primer aren't scored but gaps on the ends of target are
+    # scored.
+    # degenerate characters in primer match the characters they represent,
+    # but degenerate characters in target are always considered
+    # mismatches
     aln = skbio.alignment.pair_align_nucl(
-        primer, seq, mode='global', sub_score='NUC.4.4',
+        primer, target, mode='global', sub_score=substitution_matrix,
         free_ends=[True, True, False, False], trim_ends=True)
-    score = aln.score
-    msa = skbio.TabularMSA.from_path_seqs(aln.paths[0], (primer, seq))
+    msa = skbio.TabularMSA.from_path_seqs(aln.paths[0], (primer, target))
+    match_percent = _match_percent(msa[0], msa[1])
 
     if reverse:
         amplicon_pos = aln.paths[0].starts[1]
     else:
         amplicon_pos = aln.paths[0].stops[1]
 
-    # this computation of matches doesn't account for degenerate characters -
-    # they are scored as mismatches, unless the same degenerate character is
-    # present at the same position in both sequences. so, for example, this
-    # alignment would have 2 matches (the first two positions) and two
-    # mismatches. this seems less than ideal.
-    # CNNC
-    # CNCN
-    n_matches = msa[0].match_frequency(msa[1])
-    aligned_length = msa.shape[1]
 
-    return amplicon_pos, n_matches, aligned_length
+    return amplicon_pos, match_percent
 
 
 def _approx_match(seq, f_primer, r_primer, identity):
-    amp_start, f_matches, f_length = _align_primer(f_primer, seq)
-    amp_end, r_matches, r_length = _align_primer(r_primer, seq, reverse=True)
-    if f_matches == 0 or r_matches == 0:
-        return None
-    elif f_matches / f_length >= identity and r_matches / r_length >= identity:
+    substitution_matrix = _create_asymmetric_primer_substitution_matrix()
+    amp_start, f_match_percent = \
+        _align_primer(f_primer, seq, substitution_matrix)
+    amp_end, r_match_percent = \
+        _align_primer(r_primer, seq, substitution_matrix, reverse=True)
+    if f_match_percent >= identity and r_match_percent >= identity:
         return seq[amp_start:amp_end]
     else:
         return None
