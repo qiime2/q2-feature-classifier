@@ -12,6 +12,7 @@ import inspect
 import warnings
 from itertools import chain, islice
 import subprocess
+import re
 
 import pandas as pd
 from qiime2.plugin import (
@@ -30,8 +31,7 @@ import joblib
 from ._skl import fit_pipeline, predict, _specific_fitters
 from ._taxonomic_classifier import TaxonomicClassifier
 from .plugin_setup import plugin, citations
-
-
+from q2_dada2 import UnmergedPairs
 def _load_class(classname):
     err_message = classname + ' is not a recognised class'
     if '.' not in classname:
@@ -354,7 +354,7 @@ _parameter_descriptions = {
 
 plugin.methods.register_function(
     function=classify_sklearn,
-    inputs={'reads': FeatureData[Sequence],
+    inputs={'reads': (FeatureData[Sequence] | UnmergedPairs),
             'classifier': TaxonomicClassifier},
     parameters=_classify_parameters,
     outputs=[('classification', FeatureData[Taxonomy])],

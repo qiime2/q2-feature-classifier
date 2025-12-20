@@ -7,11 +7,14 @@
 # ----------------------------------------------------------------------------
 
 import json
+import re
 import tarfile
 import os
 
 import sklearn
 import joblib
+from q2_dada2 import UnmergedPairs
+from q2_types.feature_data import DNAFASTAFormat
 from sklearn.pipeline import Pipeline
 import qiime2.plugin
 import qiime2.plugin.model as model
@@ -114,6 +117,18 @@ def _5(data: dict) -> JSONFormat:
         json.dump(data, fh)
     return result
 
+@plugin.register_transformer
+def _6(unmerged: UnmergedPairs) -> DNAFASTAFormat:
+    output = DNAFASTAFormat()
+    with unmerged.open() as infile, output.open() as outfile:
+        for line in infile:
+            if line.startswith('>'):
+                outfile.write(line)
+            else:
+                # Remove runs of N and replace with white space
+                cleaned = re.sub(r'N+', ' ', line.strip().upper())
+                outfile.write(cleaned + '\n')
+    return output
 
 # Registrations
 plugin.register_semantic_types(TaxonomicClassifier)
