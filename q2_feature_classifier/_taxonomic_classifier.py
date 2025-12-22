@@ -117,6 +117,7 @@ def _5(data: dict) -> JSONFormat:
         json.dump(data, fh)
     return result
 
+
 @plugin.register_transformer
 def _6(unmerged: UnmergedPairs) -> DNAFASTAFormat:
     output = DNAFASTAFormat()
@@ -129,6 +130,7 @@ def _6(unmerged: UnmergedPairs) -> DNAFASTAFormat:
                 cleaned = re.sub(r'N+', ' ', line.strip().upper())
                 outfile.write(cleaned + '\n')
     return output
+
 
 # Registrations
 plugin.register_semantic_types(TaxonomicClassifier)

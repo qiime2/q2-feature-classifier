@@ -12,7 +12,6 @@ import inspect
 import warnings
 from itertools import chain, islice
 import subprocess
-import re
 
 import pandas as pd
 from qiime2.plugin import (
@@ -32,6 +31,8 @@ from ._skl import fit_pipeline, predict, _specific_fitters
 from ._taxonomic_classifier import TaxonomicClassifier
 from .plugin_setup import plugin, citations
 from q2_dada2 import UnmergedPairs
+
+
 def _load_class(classname):
     err_message = classname + ' is not a recognised class'
     if '.' not in classname:
