@@ -8,6 +8,7 @@
 
 import skbio
 import os
+import numpy as np
 from joblib import Parallel, delayed, effective_n_jobs
 
 from qiime2.plugin import Int, Str, Float, Range, Choices
@@ -37,54 +38,6 @@ def _primers_to_regex(f_primer, r_primer):
                                _seq_to_regex(r_primer.reverse_complement()))
 
 
-def _local_aln(primer, sequence):
-    best_score = None
-    for one_primer in sorted([str(s) for s in primer.expand_degenerates()]):
-        # `sequence` may contain degenerates. These will usually be N
-        # characters, which SSW will score as zero. Although undocumented, SSW
-        # will treat other degenerate characters as a mismatch. We acknowledge
-        # that this approach is a heuristic to finding an optimal alignment and
-        # may be revisited in the future if there's an aligner that explicitly
-        # handles degenerates.
-        this_aln = \
-            skbio.alignment.local_pairwise_align_ssw(skbio.DNA(one_primer),
-                                                     sequence)
-        score = this_aln[1]
-        if best_score is None or score > best_score:
-            best_score = score
-            best_aln = this_aln
-    return best_aln
-
-
-def _semisemiglobal(primer, sequence, reverse=False):
-    if reverse:
-        primer = primer.reverse_complement()
-
-    # locally align the primer
-    (aln_prim, aln_seq), score, (prim_pos, seq_pos) = \
-        _local_aln(primer, sequence)
-    amplicon_pos = seq_pos[1]+len(primer)-prim_pos[1]
-
-    # naively extend the alignment to be semi-global
-    bits = [primer[:prim_pos[0]], aln_prim, primer[prim_pos[1]+1:]]
-    aln_prim = ''.join(map(str, bits))
-    bits = ['-'*(prim_pos[0]-seq_pos[0]),
-            sequence[max(seq_pos[0]-prim_pos[0], 0):seq_pos[0]],
-            aln_seq,
-            sequence[seq_pos[1]+1:amplicon_pos],
-            '-'*(amplicon_pos-len(sequence))]
-    aln_seq = ''.join(map(str, bits))
-
-    # count the matches
-    matches = sum(s in skbio.DNA.degenerate_map.get(p, {p})
-                  for p, s in zip(aln_prim, aln_seq))
-
-    if reverse:
-        amplicon_pos = max(seq_pos[0]-prim_pos[0], 0)
-
-    return amplicon_pos, matches, len(aln_prim)
-
-
 def _exact_match(seq, f_primer, r_primer):
     try:
         regex = _primers_to_regex(f_primer, r_primer)
@@ -95,12 +48,100 @@ def _exact_match(seq, f_primer, r_primer):
         return None
 
 
+def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
+    """ Create an asymmetric substitution matrix for matching degenerate
+        primers to target sequences
+
+        This is asymmetic such that degenerate characters in primers will
+        score as matches when the target sequences contains a relevant
+        character. Degenerate characters in target sequences however always
+        score as a mismatch.
+
+        This is designed on the assumption that primers contain degenerate
+        characters because they represent a pool of sequences that will
+        actually be present in a PCR reaction, but degenerate characters in
+        target sequences represent error or uncertainty.
+
+        This is intended for use with `skbio.alignment.pair_align`, and the
+        primer should be passed as the first sequence and the target as the
+        second sequence.
+    """
+    definite_chars = sorted(skbio.DNA.definite_chars)
+    degenerate_chars = sorted(skbio.DNA.degenerate_chars)
+    chars = definite_chars + degenerate_chars
+
+    sm = np.zeros((len(chars), len(chars)))
+
+    for row, c1 in enumerate(chars):
+        for col, c2 in enumerate(chars):
+            if c1 in definite_chars:
+                if c2 in definite_chars:
+                    if c1 == c2:
+                        sm[(row, col)] = match
+                    else:
+                        sm[(row, col)] = mismatch
+                else:  # degenerate char in query sequence is always a mismatch
+                    sm[(row, col)] = mismatch
+            else:  # primer character is degenerate
+                if c2 in skbio.DNA.degenerate_map[c1]:
+                    sm[(row, col)] = match
+                else:
+                    sm[(row, col)] = mismatch
+    return skbio.SubstitutionMatrix(chars, sm)
+
+
+def _match_percent(primer, target):
+    """ Compute percent of matching positions in alignments, accounting for
+        primer degeneracies
+    """
+    matches = 0
+    for primer_c, target_c in zip(str(primer), str(target)):
+        if target_c in skbio.DNA.degenerate_chars:
+            continue
+        if primer_c == target_c:
+            matches += 1
+        elif (primer_c in skbio.DNA.degenerate_chars and
+              target_c in skbio.DNA.degenerate_map[primer_c]):
+            matches += 1
+        else:
+            continue
+    return matches / len(primer)
+
+
+def _align_primer(primer, target, substitution_matrix, reverse=False):
+    if reverse:
+        primer = primer.reverse_complement()
+
+    # perform pairwise semi-global alignment, such that gaps on the
+    # ends of primer aren't scored but gaps on the ends of target are
+    # scored.
+    # degenerate characters in primer match the characters they represent,
+    # but degenerate characters in target are always considered
+    # mismatches
+    aln = skbio.alignment.pair_align_nucl(
+        primer, target, mode='global', sub_score=substitution_matrix,
+        free_ends=[True, True, False, False], trim_ends=True)
+    msa = skbio.TabularMSA.from_path_seqs(aln.paths[0], (primer, target))
+    match_percent = _match_percent(msa[0], msa[1])
+
+    if reverse:
+        amplicon_pos = aln.paths[0].starts[1]
+    else:
+        amplicon_pos = aln.paths[0].stops[1]
+
+    return amplicon_pos, match_percent
+
+
 def _approx_match(seq, f_primer, r_primer, identity):
-    beg, b_matches, b_length = _semisemiglobal(f_primer, seq)
-    end, e_matches, e_length = _semisemiglobal(r_primer, seq, reverse=True)
-    if (b_matches + e_matches) / (b_length + e_length) >= identity:
-        return seq[beg:end]
-    return None
+    substitution_matrix = _create_asymmetric_primer_substitution_matrix()
+    amp_start, f_match_percent = \
+        _align_primer(f_primer, seq, substitution_matrix)
+    amp_end, r_match_percent = \
+        _align_primer(r_primer, seq, substitution_matrix, reverse=True)
+    if f_match_percent >= identity and r_match_percent >= identity:
+        return seq[amp_start:amp_end]
+    else:
+        return None
 
 
 def _gen_reads(sequence, f_primer, r_primer, trim_right, trunc_len, trim_left,
