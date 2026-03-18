@@ -179,7 +179,7 @@ def _gen_reads(sequence, f_primer, r_primer, trim_right, trunc_len, trim_left,
 def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                   r_primer: str, trim_right: int = 0,
                   trunc_len: int = 0, trim_left: int = 0,
-                  identity: float = 0.8, min_length: int = 50,
+                  identity: float = 0.7, min_length: int = 50,
                   max_length: int = 0, n_jobs: int = 1,
                   batch_size: int = 'auto', read_orientation: str = 'both') \
                   -> DNAFASTAFormat:
