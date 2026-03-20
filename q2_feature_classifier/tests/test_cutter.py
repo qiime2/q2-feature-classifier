@@ -161,7 +161,12 @@ class CutterTests(FeatureClassifierTestPluginBase):
 
 
 class TestCreateAsymmetricPrimerSubstitutionMatrix(
-        FeatureClassifierTestPluginBase):
+        FeatureClassifierTestPluginBase
+):
+    @classmethod
+    def setUpClass(cls):
+        cls.chars = sorted(skbio.DNA.definite_chars) + \
+            sorted(skbio.DNA.degenerate_chars)
 
     def test_returns_substitution_matrix(self):
         sm = _create_asymmetric_primer_substitution_matrix()
@@ -171,8 +176,8 @@ class TestCreateAsymmetricPrimerSubstitutionMatrix(
         sm_default = _create_asymmetric_primer_substitution_matrix()
         sm_custom = _create_asymmetric_primer_substitution_matrix(
             match=5, mismatch=-1)
-        self.assertIsInstance(sm_custom, skbio.SubstitutionMatrix)
-        self.assertFalse(np.array_equal(sm_default.scores, sm_custom.scores))
+        self.assertEqual({2, -3}, set(np.unique(sm_default.scores)))
+        self.assertEqual({5, -1}, set(np.unique(sm_custom.scores)))
 
     def test_matrix_covers_all_dna_chars(self):
         sm = _create_asymmetric_primer_substitution_matrix()
@@ -185,9 +190,7 @@ class TestCreateAsymmetricPrimerSubstitutionMatrix(
         # and 'mismatch' when target is C or G
         sm = _create_asymmetric_primer_substitution_matrix(
             match=2, mismatch=-3)
-        chars = sorted(skbio.DNA.definite_chars) + sorted(
-            skbio.DNA.degenerate_chars)
-        idx = {c: i for i, c in enumerate(chars)}
+        idx = {c: i for i, c in enumerate(self.chars)}
         self.assertEqual(sm.scores[idx['W'], idx['A']], 2)
         self.assertEqual(sm.scores[idx['W'], idx['T']], 2)
         self.assertEqual(sm.scores[idx['W'], idx['C']], -3)
@@ -195,21 +198,18 @@ class TestCreateAsymmetricPrimerSubstitutionMatrix(
 
     def test_definite_primer_vs_degenerate_target_is_always_mismatch(self):
         # A degenerate character in the target is always a mismatch regardless
-        # of which definite base the primer has
+        # of which base the primer has
         sm = _create_asymmetric_primer_substitution_matrix(
             match=2, mismatch=-3)
-        chars = sorted(skbio.DNA.definite_chars) + sorted(
-            skbio.DNA.degenerate_chars)
-        idx = {c: i for i, c in enumerate(chars)}
+        idx = {c: i for i, c in enumerate(self.chars)}
         self.assertEqual(sm.scores[idx['A'], idx['W']], -3)
         self.assertEqual(sm.scores[idx['A'], idx['N']], -3)
+        self.assertEqual(sm.scores[idx['W'], idx['N']], -3)
 
     def test_definite_primer_vs_definite_target_match_and_mismatch(self):
         sm = _create_asymmetric_primer_substitution_matrix(
             match=2, mismatch=-3)
-        chars = sorted(skbio.DNA.definite_chars) + sorted(
-            skbio.DNA.degenerate_chars)
-        idx = {c: i for i, c in enumerate(chars)}
+        idx = {c: i for i, c in enumerate(self.chars)}
         self.assertEqual(sm.scores[idx['A'], idx['A']], 2)
         self.assertEqual(sm.scores[idx['A'], idx['C']], -3)
 
@@ -312,13 +312,13 @@ class TestApproxMatch(FeatureClassifierTestPluginBase):
         seq = skbio.DNA('AAAAGGGGCCCC')
         amplicon = _approx_match(seq, skbio.DNA('AAAA'),
                                  skbio.DNA('GGGG'), identity=0.9)
-        self.assertIsNotNone(amplicon)
         self.assertEqual(str(amplicon), 'GGGG')
 
     def test_f_primer_below_identity_returns_none(self):
-        # TTTT does not match the AAAA region of seq → match_percent = 0.0
+        # TTAA does not match the AAAA region of seq at 0.7 identity
+        # (has 0.5 identity)
         seq = skbio.DNA('AAAAGGGGCCCC')
-        amplicon = _approx_match(seq, skbio.DNA('TTTT'),
+        amplicon = _approx_match(seq, skbio.DNA('TTAA'),
                                  skbio.DNA('GGGG'), identity=0.7)
         self.assertIsNone(amplicon)
 
