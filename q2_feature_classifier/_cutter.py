@@ -103,8 +103,6 @@ def _match_percent(primer, target):
         elif (primer_c in skbio.DNA.degenerate_chars and
               target_c in skbio.DNA.degenerate_map[primer_c]):
             matches += 1
-        else:
-            continue
     return matches / len(primer)
 
 
