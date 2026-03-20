@@ -50,7 +50,7 @@ def _exact_match(seq, f_primer, r_primer):
 
 def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
     """ Create an asymmetric substitution matrix for matching degenerate
-        primers to target sequences
+        primers to target sequences.
 
         This is asymmetic such that degenerate characters in primers will
         score as matches when the target sequences contains a relevant
@@ -64,7 +64,9 @@ def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
 
         This is intended for use with `skbio.alignment.pair_align`, and the
         primer should be passed as the first sequence and the target as the
-        second sequence.
+        second sequence. This is because primers are represented by the rows
+        and the target is represented by columns in the resulting
+        skbio.SubstitutionMatrix.
     """
     definite_chars = sorted(skbio.DNA.definite_chars)
     degenerate_chars = sorted(skbio.DNA.degenerate_chars)
@@ -80,7 +82,7 @@ def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
                         sm[(row, col)] = match
                     else:
                         sm[(row, col)] = mismatch
-                else:  # degenerate char in query sequence is always a mismatch
+                else:  # degenerate char in target sequence always mismatches
                     sm[(row, col)] = mismatch
             else:  # primer character is degenerate
                 if c2 in skbio.DNA.degenerate_map[c1]:
@@ -92,7 +94,12 @@ def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
 
 def _match_percent(primer, target):
     """ Compute proportion of matching positions in alignments, accounting for
-        primer degeneracies
+        primer degeneracies.
+
+        Parameters
+        ----------
+        primer : skbio.DNA
+        target : skbio.DNA
     """
     matches = 0
     for primer_c, target_c in zip(str(primer), str(target)):
@@ -110,12 +117,28 @@ def _align_primer(primer, target, substitution_matrix, reverse=False):
     if reverse:
         primer = primer.reverse_complement()
 
-    # perform pairwise semi-global alignment, such that gaps on the
-    # ends of primer aren't scored but gaps on the ends of target are
-    # scored.
+    # perform pairwise semi-global alignment such that gaps on the
+    # ends of primer are free from penalization but gaps on the ends of target
+    # are penalized. for example:
+
+    # gaps on the ends of the primer, as in the following, are free:
+    # --AAAA----------
+    # CCAAAAGGGGCCCCTT
+    # or
+    # ----------CCCC--
+    # CCAAAAGGGGCCCCTT
+
+    # gaps on the end of the target, as in the following, incur the penalty:
+    # AAAA------
+    # --AAGGGGCC
+    # or
+    # ------CCCC
+    # AAGGGGCC--
+
     # degenerate characters in primer match the characters they represent,
     # but degenerate characters in target are always considered
     # mismatches
+
     aln = skbio.alignment.pair_align_nucl(
         primer, target, mode='global', sub_score=substitution_matrix,
         free_ends=[True, True, False, False], trim_ends=True)
@@ -182,7 +205,8 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                   batch_size: int = 'auto', read_orientation: str = 'both') \
                   -> DNAFASTAFormat:
     """Extract the read selected by a primer or primer pair. Only sequences
-    which match the primers at greater than the specified identity are returned
+    which match the primers at greater than the specified identity are
+    returned. Note that the primers are *not* included in the extracted reads.
 
     Parameters
     ----------
