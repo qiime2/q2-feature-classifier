@@ -91,7 +91,7 @@ def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
 
 
 def _match_percent(primer, target):
-    """ Compute percent of matching positions in alignments, accounting for
+    """ Compute proportion of matching positions in alignments, accounting for
         primer degeneracies
     """
     matches = 0
