@@ -9,15 +9,31 @@
 import skbio
 import os
 import numpy as np
+import pandas as pd
+import qiime2
+from collections import namedtuple
 from joblib import Parallel, delayed, effective_n_jobs
 
 from qiime2.plugin import Int, Str, Float, Range, Choices
 from q2_types.feature_data import (FeatureData, Sequence, DNAIterator,
                                    DNASequencesDirectoryFormat, DNAFASTAFormat)
+from q2_types.metadata import ImmutableMetadata, ImmutableMetadataFormat
 from q2_feature_classifier._skl import _chunks
 from q2_feature_classifier.classifier import _autotune_reads_per_batch
 
 from .plugin_setup import plugin
+
+
+_AlignResult = namedtuple(
+    '_AlignResult', ['amplicon_pos', 'match_percent', 'primer_start', 'primer_end'])
+
+_STATS_COLUMNS = [
+    'outcome', 'match-orientation', 'match-method',
+    'f-primer-start', 'f-primer-end', 'r-primer-start', 'r-primer-end',
+    'f-primer-match-pct', 'r-primer-match-pct',
+    'amplicon-length-pre-trim', 'amplicon-length-post-trim',
+    'input-sequence-length',
+]
 
 
 def _seq_to_regex(seq):
@@ -42,8 +58,11 @@ def _exact_match(seq, f_primer, r_primer):
     try:
         regex = _primers_to_regex(f_primer, r_primer)
         match = next(seq.find_with_regex(regex))
-        beg, end = match.start + len(f_primer), match.stop - len(r_primer)
-        return seq[beg:end]
+        f_start = match.start
+        f_end = match.start + len(f_primer)
+        r_start = match.stop - len(r_primer)
+        r_end = match.stop
+        return seq[f_end:r_start], f_start, f_end, r_start, r_end
     except StopIteration:
         return None
 
@@ -145,22 +164,26 @@ def _align_primer(primer, target, substitution_matrix, reverse=False):
     msa = skbio.TabularMSA.from_path_seqs(aln.paths[0], (primer, target))
     match_percent = _match_percent(msa[0], msa[1])
 
-    if reverse:
-        amplicon_pos = aln.paths[0].starts[1]
-    else:
-        amplicon_pos = aln.paths[0].stops[1]
+    primer_start = aln.paths[0].starts[1]
+    primer_end = aln.paths[0].stops[1]
 
-    return amplicon_pos, match_percent
+    if reverse:
+        amplicon_pos = primer_start
+    else:
+        amplicon_pos = primer_end
+
+    return _AlignResult(amplicon_pos, match_percent, primer_start, primer_end)
 
 
 def _approx_match(seq, f_primer, r_primer, identity):
     substitution_matrix = _create_asymmetric_primer_substitution_matrix()
-    amp_start, f_match_percent = \
-        _align_primer(f_primer, seq, substitution_matrix)
-    amp_end, r_match_percent = \
-        _align_primer(r_primer, seq, substitution_matrix, reverse=True)
-    if f_match_percent >= identity and r_match_percent >= identity:
-        return seq[amp_start:amp_end]
+    f_result = _align_primer(f_primer, seq, substitution_matrix)
+    r_result = _align_primer(r_primer, seq, substitution_matrix, reverse=True)
+    if f_result.match_percent >= identity and r_result.match_percent >= identity:
+        return (seq[f_result.amplicon_pos:r_result.amplicon_pos],
+                f_result.primer_start, f_result.primer_end,
+                r_result.primer_start, r_result.primer_end,
+                f_result.match_percent, r_result.match_percent)
     else:
         return None
 
@@ -169,32 +192,98 @@ def _gen_reads(sequence, f_primer, r_primer, trim_right, trunc_len, trim_left,
                identity, min_length, max_length, read_orientation):
     f_primer = skbio.DNA(f_primer)
     r_primer = skbio.DNA(r_primer)
+
+    stats = {
+        'id': sequence.metadata['id'],
+        'input-sequence-length': len(sequence),
+        'match-orientation': 'none',
+        'match-method': 'none',
+        'f-primer-start': None,
+        'f-primer-end': None,
+        'r-primer-start': None,
+        'r-primer-end': None,
+        'f-primer-match-pct': None,
+        'r-primer-match-pct': None,
+        'amplicon-length-pre-trim': None,
+        'amplicon-length-post-trim': None,
+        'outcome': 'no-primer-match',
+    }
+
     amp = None
+
     if read_orientation in ['forward', 'both']:
-        amp = _exact_match(sequence, f_primer, r_primer)
-    if not amp and read_orientation in ['reverse', 'both']:
-        amp = _exact_match(sequence.reverse_complement(), f_primer, r_primer)
-    if not amp and read_orientation in ['forward', 'both']:
-        amp = _approx_match(sequence, f_primer, r_primer, identity)
-    if not amp and read_orientation in ['reverse', 'both']:
-        amp = _approx_match(
+        result = _exact_match(sequence, f_primer, r_primer)
+        if result is not None:
+            amp, f_start, f_end, r_start, r_end = result
+            stats.update({
+                'match-orientation': 'forward', 'match-method': 'exact',
+                'f-primer-start': f_start, 'f-primer-end': f_end,
+                'r-primer-start': r_start, 'r-primer-end': r_end,
+                'f-primer-match-pct': 1.0, 'r-primer-match-pct': 1.0,
+            })
+
+    if amp is None and read_orientation in ['reverse', 'both']:
+        result = _exact_match(sequence.reverse_complement(), f_primer, r_primer)
+        if result is not None:
+            amp, f_start, f_end, r_start, r_end = result
+            stats.update({
+                'match-orientation': 'reverse', 'match-method': 'exact',
+                'f-primer-start': f_start, 'f-primer-end': f_end,
+                'r-primer-start': r_start, 'r-primer-end': r_end,
+                'f-primer-match-pct': 1.0, 'r-primer-match-pct': 1.0,
+            })
+
+    if amp is None and read_orientation in ['forward', 'both']:
+        result = _approx_match(sequence, f_primer, r_primer, identity)
+        if result is not None:
+            amp, f_start, f_end, r_start, r_end, f_pct, r_pct = result
+            stats.update({
+                'match-orientation': 'forward', 'match-method': 'approximate',
+                'f-primer-start': f_start, 'f-primer-end': f_end,
+                'r-primer-start': r_start, 'r-primer-end': r_end,
+                'f-primer-match-pct': f_pct, 'r-primer-match-pct': r_pct,
+            })
+
+    if amp is None and read_orientation in ['reverse', 'both']:
+        result = _approx_match(
             sequence.reverse_complement(), f_primer, r_primer, identity)
-    if not amp:
-        return
-    # we want to filter by max length before trimming
+        if result is not None:
+            amp, f_start, f_end, r_start, r_end, f_pct, r_pct = result
+            stats.update({
+                'match-orientation': 'reverse', 'match-method': 'approximate',
+                'f-primer-start': f_start, 'f-primer-end': f_end,
+                'r-primer-start': r_start, 'r-primer-end': r_end,
+                'f-primer-match-pct': f_pct, 'r-primer-match-pct': r_pct,
+            })
+
+    if amp is None:
+        return None, stats
+
+    stats['amplicon-length-pre-trim'] = len(amp)
+
+    # filter by max length before trimming
     if max_length > 0 and len(amp) > max_length:
-        return
+        stats['outcome'] = 'excluded-max-length'
+        return None, stats
+
     if trim_right > 0:
         amp = amp[:-trim_right]
     if trunc_len > 0:
         amp = amp[:trunc_len]
     if trim_left > 0:
         amp = amp[trim_left:]
-    if min_length > 0 and len(amp) < min_length:
-        return
+
     if not amp:
-        return
-    return amp
+        stats['outcome'] = 'excluded-empty-after-trim'
+        return None, stats
+
+    if min_length > 0 and len(amp) < min_length:
+        stats['outcome'] = 'excluded-min-length'
+        return None, stats
+
+    stats['amplicon-length-post-trim'] = len(amp)
+    stats['outcome'] = 'extracted'
+    return amp, stats
 
 
 def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
@@ -203,7 +292,7 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                   identity: float = 0.7, min_length: int = 50,
                   max_length: int = 0, n_jobs: int = 1,
                   batch_size: int = 'auto', read_orientation: str = 'both') \
-                  -> DNAFASTAFormat:
+                  -> (DNAFASTAFormat, ImmutableMetadataFormat):  # noqa: E501
     """Extract the read selected by a primer or primer pair. Only sequences
     which match the primers at greater than the specified identity are
     returned. Note that the primers are *not* included in the extracted reads.
@@ -258,25 +347,31 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
             sequences.file.view(DNAFASTAFormat), n_jobs)
     sequences = sequences.file.view(DNAIterator)
     ff = DNAFASTAFormat()
+    all_stats = []
     with open(str(ff), 'a') as fh:
         with Parallel(n_jobs) as parallel:
             for chunk in _chunks(sequences, batch_size):
-                amplicons = parallel(delayed(_gen_reads)(sequence, f_primer,
-                                                         r_primer,
-                                                         trim_right,
-                                                         trunc_len,
-                                                         trim_left,
-                                                         identity,
-                                                         min_length,
-                                                         max_length,
-                                                         read_orientation)
-                                     for sequence in chunk)
-                for amplicon in amplicons:
+                results = parallel(delayed(_gen_reads)(sequence, f_primer,
+                                                       r_primer,
+                                                       trim_right,
+                                                       trunc_len,
+                                                       trim_left,
+                                                       identity,
+                                                       min_length,
+                                                       max_length,
+                                                       read_orientation)
+                                   for sequence in chunk)
+                for amplicon, stats in results:
+                    all_stats.append(stats)
                     if amplicon is not None:
                         skbio.write(amplicon, format='fasta', into=fh)
     if os.stat(str(ff)).st_size == 0:
         raise RuntimeError("No matches found")
-    return ff
+    stats_df = pd.DataFrame(all_stats, columns=['id'] + _STATS_COLUMNS)
+    stats_df = stats_df.set_index('id')
+    stats_ff = ImmutableMetadataFormat()
+    qiime2.Metadata(stats_df).save(str(stats_ff))
+    return ff, stats_ff
 
 
 plugin.methods.register_function(
@@ -294,7 +389,8 @@ plugin.methods.register_function(
                 'batch_size': Int % Range(1, None) | Str % Choices(['auto']),
                 'read_orientation': Str % Choices(['both', 'forward',
                                                    'reverse'])},
-    outputs=[('reads', FeatureData[Sequence])],
+    outputs=[('reads', FeatureData[Sequence]),
+             ('read_extraction_stats', ImmutableMetadata)],
     name='Extract reads from reference sequences.',
     description='Extract simulated amplicon reads from a reference database. '
                 'Performs in-silico PCR to extract simulated amplicons from '
@@ -337,5 +433,17 @@ plugin.methods.register_function(
                             'sequences: "forward" searches for primer hits in '
                             'the forward direction, "reverse" searches '
                             'reverse-complement, and "both" searches both '
-                            'directions.'}
+                            'directions.'},
+    output_descriptions={
+        'reads': 'Extracted reads.',
+        'read_extraction_stats': 'Per-input-sequence report of primer '
+                                 'alignment outcomes. Includes match '
+                                 'orientation, match method (exact or '
+                                 'approximate), primer binding positions in '
+                                 'the matched-orientation sequence, forward '
+                                 'and reverse primer match percentages, '
+                                 'amplicon length before and after trimming, '
+                                 'and the final extraction outcome for each '
+                                 'sequence.',
+    }
 )
