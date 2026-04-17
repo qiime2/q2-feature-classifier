@@ -8,6 +8,7 @@
 
 import numpy as np
 import skbio
+import qiime2
 
 from qiime2.sdk import Artifact
 from qiime2.plugins.feature_classifier.actions import extract_reads
@@ -34,6 +35,10 @@ class CutterTests(FeatureClassifierTestPluginBase):
         self.mixed_sequences = Artifact.import_data(
             'FeatureData[Sequence]',
             self.get_data_path('dna-sequences-mixed.fasta'))
+
+        self.mixed_sequences2 = Artifact.import_data(
+            'FeatureData[Sequence]',
+            self.get_data_path('dna-sequences-mixed2.fasta'))
 
         self.f_primer = 'AGAGA'
         self.r_primer = 'GCTGC'
@@ -159,6 +164,213 @@ class CutterTests(FeatureClassifierTestPluginBase):
                 self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
                 trunc_len=1)
 
+    def test_extract_reads_stats_returned(self):
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=4)
+        self.assertIsNotNone(results.read_extraction_stats)
+
+    def test_extract_reads_stats_schema(self):
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=4)
+        df = results.read_extraction_stats.view(qiime2.Metadata).to_dataframe()
+        expected_columns = {
+            'outcome', 'match-orientation', 'match-method',
+            'f-primer-start', 'f-primer-end', 'r-primer-start', 'r-primer-end',
+            'f-primer-match-pct', 'r-primer-match-pct',
+            'amplicon-length-pre-trim', 'amplicon-length-post-trim',
+            'input-sequence-length',
+        }
+        self.assertEqual(set(df.columns), expected_columns)
+        self.assertEqual(len(df), 5)
+
+    def test_extract_reads_stats_all_extracted(self):
+        amps, stats = extract_reads(
+            self.mixed_sequences2, f_primer=self.f_primer,
+            r_primer=self.r_primer, min_length=4, trunc_len=6)
+
+        amps = amps.view(qiime2.Metadata).to_dataframe()
+        self.assertEqual(amps['Sequence']['Sequence1'], 'TTTACG')
+        self.assertEqual(amps['Sequence']['Sequence2'], 'AAGT')
+        self.assertEqual(amps['Sequence']['Sequence3'], 'ACCT')
+        self.assertEqual(amps['Sequence']['Sequence5'], 'ACTT')
+
+        stats = stats.view(qiime2.Metadata).to_dataframe()
+        self.assertEqual(stats['outcome']['Sequence1'], 'extracted')
+        self.assertEqual(stats['outcome']['Sequence2'], 'extracted')
+        self.assertEqual(stats['outcome']['Sequence3'], 'extracted')
+        self.assertEqual(stats['outcome']['Sequence4'], 'no-primer-match')
+        self.assertEqual(stats['outcome']['Sequence5'], 'extracted')
+
+        self.assertEqual(stats['match-method']['Sequence1'], 'approximate')
+        self.assertEqual(stats['match-method']['Sequence2'], 'approximate')
+        self.assertEqual(stats['match-method']['Sequence3'], 'exact')
+        self.assertTrue(np.isnan(stats['match-method']['Sequence4']))
+        self.assertEqual(stats['match-method']['Sequence5'], 'exact')
+
+        self.assertEqual(stats['match-orientation']['Sequence1'], 'forward')
+        self.assertEqual(stats['match-orientation']['Sequence2'], 'reverse')
+        self.assertEqual(stats['match-orientation']['Sequence3'], 'forward')
+        self.assertTrue(np.isnan(stats['match-orientation']['Sequence4']))
+        self.assertEqual(stats['match-orientation']['Sequence5'], 'reverse')
+
+        self.assertEqual(stats['f-primer-match-pct']['Sequence1'], 5./5.)
+        self.assertEqual(stats['f-primer-match-pct']['Sequence2'], 4./5.)
+        self.assertEqual(stats['f-primer-match-pct']['Sequence3'], 5./5.)
+        self.assertTrue(np.isnan(stats['f-primer-match-pct']['Sequence4']))
+        self.assertEqual(stats['f-primer-match-pct']['Sequence5'], 5./5.)
+
+        self.assertEqual(stats['r-primer-match-pct']['Sequence1'], 4./5.)
+        self.assertEqual(stats['r-primer-match-pct']['Sequence2'], 4./5.)
+        self.assertEqual(stats['r-primer-match-pct']['Sequence3'], 5./5.)
+        self.assertTrue(np.isnan(stats['r-primer-match-pct']['Sequence4']))
+        self.assertEqual(stats['r-primer-match-pct']['Sequence5'], 5./5.)
+
+        self.assertEqual(stats['amplicon-length-pre-trim']['Sequence1'], 7)
+        self.assertEqual(stats['amplicon-length-pre-trim']['Sequence2'], 4)
+        self.assertEqual(stats['amplicon-length-pre-trim']['Sequence3'], 4)
+        self.assertTrue(
+            np.isnan(stats['amplicon-length-pre-trim']['Sequence4']))
+        self.assertEqual(stats['amplicon-length-pre-trim']['Sequence5'], 4)
+
+        self.assertEqual(stats['amplicon-length-post-trim']['Sequence1'], 6)
+        self.assertEqual(stats['amplicon-length-post-trim']['Sequence2'], 4)
+        self.assertEqual(stats['amplicon-length-post-trim']['Sequence3'], 4)
+        self.assertTrue(
+            np.isnan(stats['amplicon-length-post-trim']['Sequence4']))
+        self.assertEqual(stats['amplicon-length-post-trim']['Sequence5'], 4)
+
+        self.assertEqual(stats['f-primer-start']['Sequence1'], 3)
+        self.assertEqual(stats['f-primer-start']['Sequence2'], 0)
+        self.assertEqual(stats['f-primer-start']['Sequence3'], 1)
+        self.assertTrue(
+            np.isnan(stats['f-primer-start']['Sequence4']))
+        self.assertEqual(stats['f-primer-start']['Sequence5'], 0)
+
+        self.assertEqual(stats['f-primer-end']['Sequence1'], 8)
+        self.assertEqual(stats['f-primer-end']['Sequence2'], 5)
+        self.assertEqual(stats['f-primer-end']['Sequence3'], 6)
+        self.assertTrue(
+            np.isnan(stats['f-primer-end']['Sequence4']))
+        self.assertEqual(stats['f-primer-end']['Sequence5'], 5)
+
+        self.assertEqual(stats['r-primer-start']['Sequence1'], 15)
+        self.assertEqual(stats['r-primer-start']['Sequence2'], 9)
+        self.assertEqual(stats['r-primer-start']['Sequence3'], 10)
+        self.assertTrue(
+            np.isnan(stats['r-primer-start']['Sequence4']))
+        self.assertEqual(stats['r-primer-start']['Sequence5'], 9)
+
+        self.assertEqual(stats['r-primer-end']['Sequence1'], 20)
+        self.assertEqual(stats['r-primer-end']['Sequence2'], 14)
+        self.assertEqual(stats['r-primer-end']['Sequence3'], 15)
+        self.assertTrue(
+            np.isnan(stats['r-primer-end']['Sequence4']))
+        self.assertEqual(stats['r-primer-end']['Sequence5'], 14)
+
+    def test_extract_reads_stats_orientation(self):
+        results = extract_reads(
+            self.mixed_sequences, f_primer=self.f_primer,
+            r_primer=self.r_primer, min_length=4)
+        df = results.read_extraction_stats.view(qiime2.Metadata).to_dataframe()
+
+        self.assertEqual(df['match-orientation']['Sequence1'], 'forward')
+        self.assertEqual(df['match-orientation']['Sequence2'], 'reverse')
+        self.assertEqual(df['match-orientation']['Sequence3'], 'forward')
+        self.assertEqual(df['match-orientation']['Sequence4'], 'forward')
+        self.assertEqual(df['match-orientation']['Sequence5'], 'reverse')
+
+    def test_extract_reads_stats_trim_reduces_post_trim_length(self):
+        results = extract_reads(
+            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
+            min_length=3, trim_right=1)
+        df = results.read_extraction_stats.view(qiime2.Metadata).to_dataframe()
+        self.assertTrue((df['amplicon-length-pre-trim'] == 4).all())
+        self.assertTrue((df['amplicon-length-post-trim'] == 3).all())
+
+    def test_extract_reads_stats_excluded_min_length(self):
+        amps, stats = extract_reads(
+            self.mixed_sequences2, f_primer=self.f_primer,
+            r_primer=self.r_primer, min_length=5, trunc_len=6)
+
+        amps = amps.view(qiime2.Metadata).to_dataframe()
+        self.assertEqual(len(amps), 1)
+        self.assertEqual(amps['Sequence']['Sequence1'], 'TTTACG')
+
+        stats = stats.view(qiime2.Metadata).to_dataframe()
+        self.assertEqual(stats['outcome']['Sequence1'], 'extracted')
+        self.assertEqual(stats['outcome']['Sequence2'], 'excluded-min-length')
+        self.assertEqual(stats['outcome']['Sequence3'], 'excluded-min-length')
+        self.assertEqual(stats['outcome']['Sequence4'], 'no-primer-match')
+        self.assertEqual(stats['outcome']['Sequence5'], 'excluded-min-length')
+
+    def test_extract_reads_stats_excluded_primers_out_of_order(self):
+        # Forward primer 'AAAA' aligns at the end of the target and the
+        # reverse primer 'GGGG' (RC = 'CCCC') aligns at the start, so both
+        # primers individually pass the identity threshold but are placed in
+        # reversed order along the sequence. The exact-match regex cannot
+        # match this arrangement, so the approximate path is exercised.
+        from q2_feature_classifier._cutter import _gen_reads
+        seq = skbio.DNA('CCCCTTTTAAAA', metadata={'id': 'test-seq'})
+        amp, stats = _gen_reads(seq, 'AAAA', 'GGGG',
+                                trim_right=0, trunc_len=0, trim_left=0,
+                                identity=0.7, min_length=0, max_length=0,
+                                read_orientation='forward')
+        self.assertIsNone(amp)
+        self.assertEqual(stats['outcome'], 'excluded-primers-out-of-order')
+        self.assertLess(stats['r-primer-start'], stats['f-primer-end'])
+        self.assertIsNone(stats['amplicon-length-pre-trim'])
+        self.assertIsNone(stats['amplicon-length-post-trim'])
+
+    def test_extract_reads_stats_no_primer_match(self):
+        from q2_feature_classifier._cutter import _gen_reads
+        seq = skbio.DNA('TTTTTTTTTTTTTT', metadata={'id': 'test-seq'})
+        amp, stats = _gen_reads(seq, self.f_primer, self.r_primer,
+                                trim_right=0, trunc_len=0, trim_left=0,
+                                identity=0.9, min_length=0, max_length=0,
+                                read_orientation='forward')
+        self.assertIsNone(amp)
+        self.assertEqual(stats['outcome'], 'no-primer-match')
+        self.assertIsNone(stats['match-orientation'])
+        self.assertIsNone(stats['f-primer-start'])
+
+    def _assert_gen_reads_rc_symmetry(self, seq_str, expected_method,
+                                      expected_amp):
+        from q2_feature_classifier._cutter import _gen_reads
+        seq = skbio.DNA(seq_str, metadata={'id': 'test-seq'})
+        rc_seq = seq.reverse_complement()
+
+        amp_fwd, stats_fwd = _gen_reads(
+            seq, self.f_primer, self.r_primer,
+            trim_right=0, trunc_len=0, trim_left=0,
+            identity=0.7, min_length=0, max_length=0,
+            read_orientation='both')
+        amp_rev, stats_rev = _gen_reads(
+            rc_seq, self.f_primer, self.r_primer,
+            trim_right=0, trunc_len=0, trim_left=0,
+            identity=0.7, min_length=0, max_length=0,
+            read_orientation='both')
+
+        self.assertEqual(str(amp_fwd), expected_amp)
+        self.assertEqual(str(amp_rev), expected_amp)
+        self.assertEqual(stats_fwd['match-method'], expected_method)
+        self.assertEqual(stats_rev['match-method'], expected_method)
+        self.assertEqual(stats_fwd['match-orientation'], 'forward')
+        self.assertEqual(stats_rev['match-orientation'], 'reverse')
+
+    def test_gen_reads_rc_symmetry_exact(self):
+        # Trailing 'GCAGC' = RC('GCTGC') is an exact reverse-primer site on
+        # the forward strand, so the exact-match path is exercised.
+        self._assert_gen_reads_rc_symmetry('AGAGAACGTGCAGC', 'exact',
+                                           'ACGT')
+
+    def test_gen_reads_rc_symmetry_approximate(self):
+        # Trailing 'GCTGC' differs from RC('GCTGC')='GCAGC' at one position,
+        # forcing the approximate-match path (4/5 = 0.8 >= identity=0.7).
+        self._assert_gen_reads_rc_symmetry('AGAGAATTCGTGCTGC', 'approximate',
+                                           'ATTCGT')
+
 
 class TestCreateAsymmetricPrimerSubstitutionMatrix(
         FeatureClassifierTestPluginBase
@@ -262,30 +474,30 @@ class TestAlignPrimer(FeatureClassifierTestPluginBase):
     def test_perfect_forward_match_percent(self):
         primer = skbio.DNA('AAAA')
         target = skbio.DNA('GGGGAAAAGGGG')
-        _, match_pct = _align_primer(primer, target, self.sm, reverse=False)
-        self.assertAlmostEqual(match_pct, 1.0)
+        result = _align_primer(primer, target, self.sm, reverse=False)
+        self.assertAlmostEqual(result.match_percent, 1.0)
 
     def test_perfect_reverse_match_percent(self):
         # rc('TTTT') = AAAA, which matches the AAAA region perfectly
         primer = skbio.DNA('TTTT')
         target = skbio.DNA('GGGGAAAAGGGG')
-        _, match_pct = _align_primer(primer, target, self.sm, reverse=True)
-        self.assertAlmostEqual(match_pct, 1.0)
+        result = _align_primer(primer, target, self.sm, reverse=True)
+        self.assertAlmostEqual(result.match_percent, 1.0)
 
     def test_partial_forward_match_percent(self):
         # AAAC aligns to AAAA in target — 3 of 4 positions match
         primer = skbio.DNA('AAAC')
         target = skbio.DNA('GGGGAAAAGGGG')
-        _, match_pct = _align_primer(primer, target, self.sm, reverse=False)
-        self.assertAlmostEqual(match_pct, 0.75)
+        result = _align_primer(primer, target, self.sm, reverse=False)
+        self.assertAlmostEqual(result.match_percent, 0.75)
 
     def test_forward_amplicon_pos_is_after_primer(self):
         # Forward mode returns a position such that target[pos:] is the content
         # after the primer
         primer = skbio.DNA('AAAA')
         target = skbio.DNA('AAAAGGGG')
-        fwd_pos, _ = _align_primer(primer, target, self.sm, reverse=False)
-        self.assertEqual(str(target[fwd_pos:]), 'GGGG')
+        result = _align_primer(primer, target, self.sm, reverse=False)
+        self.assertEqual(str(target[result.amplicon_pos:]), 'GGGG')
 
     def test_reverse_amplicon_pos_is_before_primer(self):
         # Reverse mode: rc('GGGG') = CCCC; CCCC matches the end of target
@@ -293,15 +505,31 @@ class TestAlignPrimer(FeatureClassifierTestPluginBase):
         # amplicon
         primer = skbio.DNA('GGGG')
         target = skbio.DNA('AAAACCCC')
-        rev_pos, _ = _align_primer(primer, target, self.sm, reverse=True)
-        self.assertEqual(str(target[:rev_pos]), 'AAAA')
+        result = _align_primer(primer, target, self.sm, reverse=True)
+        self.assertEqual(str(target[:result.amplicon_pos]), 'AAAA')
 
     def test_forward_and_reverse_return_different_positions(self):
         primer = skbio.DNA('AAAA')
         target = skbio.DNA('CCCCAAAAGGGG')
-        fwd_pos, _ = _align_primer(primer, target, self.sm, reverse=False)
-        rev_pos, _ = _align_primer(primer, target, self.sm, reverse=True)
-        self.assertNotEqual(fwd_pos, rev_pos)
+        fwd = _align_primer(primer, target, self.sm, reverse=False)
+        rev = _align_primer(primer, target, self.sm, reverse=True)
+        self.assertNotEqual(fwd.amplicon_pos, rev.amplicon_pos)
+
+    def test_forward_primer_start_and_end_in_target(self):
+        # ATTA aligns at positions 4-8 in CCCCATTAGGGG
+        primer = skbio.DNA('ATTA')
+        target = skbio.DNA('CCCCATTAGGGG')
+        result = _align_primer(primer, target, self.sm, reverse=False)
+        self.assertEqual(str(target[result.primer_start:result.primer_end]),
+                         'ATTA')
+
+    def test_reverse_primer_start_and_end_in_target(self):
+        # rc('GGGG') = CCCC matches the last 4 bases of AAAACCCC
+        primer = skbio.DNA('GCCG')
+        target = skbio.DNA('AAAACGGC')
+        result = _align_primer(primer, target, self.sm, reverse=True)
+        self.assertEqual(str(target[result.primer_start:result.primer_end]),
+                         'CGGC')
 
 
 class TestApproxMatch(FeatureClassifierTestPluginBase):
@@ -310,24 +538,38 @@ class TestApproxMatch(FeatureClassifierTestPluginBase):
         # f_primer AAAA at start; rc(r_primer) = CCCC at end
         # expected amplicon = GGGG
         seq = skbio.DNA('AAAAGGGGCCCC')
-        amplicon = _approx_match(seq, skbio.DNA('AAAA'),
-                                 skbio.DNA('GGGG'), identity=0.9)
-        self.assertEqual(str(amplicon), 'GGGG')
+        result = _approx_match(seq, skbio.DNA('AAAA'),
+                               skbio.DNA('GGGG'), identity=0.9)
+        self.assertIsNotNone(result)
+        self.assertEqual(str(result[0]), 'GGGG')
+
+    def test_both_primers_match_returns_stats(self):
+        seq = skbio.DNA('AAAAGGGGCCCC')
+        result = _approx_match(seq, skbio.DNA('AAAA'),
+                               skbio.DNA('GGGG'), identity=0.9)
+        self.assertIsNotNone(result)
+        amp, f_start, f_end, r_start, r_end, f_pct, r_pct = result
+        self.assertAlmostEqual(f_pct, 1.0)
+        self.assertAlmostEqual(r_pct, 1.0)
+        # forward primer spans first 4 bases
+        self.assertEqual(str(seq[f_start:f_end]), 'AAAA')
+        # reverse primer (rc CCCC) spans last 4 bases
+        self.assertEqual(str(seq[r_start:r_end]), 'CCCC')
 
     def test_f_primer_below_identity_returns_none(self):
         # TTAA does not match the AAAA region of seq at 0.7 identity
         # (has 0.5 identity)
         seq = skbio.DNA('AAAAGGGGCCCC')
-        amplicon = _approx_match(seq, skbio.DNA('TTAA'),
-                                 skbio.DNA('GGGG'), identity=0.7)
-        self.assertIsNone(amplicon)
+        result = _approx_match(seq, skbio.DNA('TTAA'),
+                               skbio.DNA('GGGG'), identity=0.7)
+        self.assertIsNone(result)
 
     def test_r_primer_below_identity_returns_none(self):
         # rc('AAAA') = TTTT, which does not match the CCCC end → 0.0
         seq = skbio.DNA('AAAAGGGGCCCC')
-        amplicon = _approx_match(seq, skbio.DNA('AAAA'),
-                                 skbio.DNA('AAAA'), identity=0.7)
-        self.assertIsNone(amplicon)
+        result = _approx_match(seq, skbio.DNA('AAAA'),
+                               skbio.DNA('AAAA'), identity=0.7)
+        self.assertIsNone(result)
 
     def test_identity_checked_per_primer_not_combined(self):
         # f_primer AAAA matches AAAA perfectly (1.0).
@@ -336,9 +578,9 @@ class TestApproxMatch(FeatureClassifierTestPluginBase):
         # Under a combined-identity scheme: (1.0 + 0.5) / 2 = 0.75 ≥ 0.7
         # would have passed, so this test distinguishes the two behaviours.
         seq = skbio.DNA('AAAAGGGGCCCC')
-        amplicon = _approx_match(seq, skbio.DNA('AAAA'),
-                                 skbio.DNA('TGGT'), identity=0.7)
-        self.assertIsNone(amplicon)
+        result = _approx_match(seq, skbio.DNA('AAAA'),
+                               skbio.DNA('TGGT'), identity=0.7)
+        self.assertIsNone(result)
 
     def test_identity_one_requires_perfect_match(self):
         seq = skbio.DNA('AAAAGGGGCCCC')
