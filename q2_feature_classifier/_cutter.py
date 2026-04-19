@@ -292,7 +292,7 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                   identity: float = 0.7, min_length: int = 50,
                   max_length: int = 0, n_jobs: int = 1,
                   batch_size: int = 'auto', read_orientation: str = 'both') \
-                  -> (DNAFASTAFormat, ImmutableMetadataFormat):  # noqa: E501
+                  -> tuple[DNAFASTAFormat, ImmutableMetadataFormat]:
     """Extract the read selected by a primer or primer pair. Only sequences
     which match the primers at greater than the specified identity are
     returned. Note that the primers are *not* included in the extracted reads.
