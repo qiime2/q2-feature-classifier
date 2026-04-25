@@ -198,6 +198,7 @@ class CutterTests(FeatureClassifierTestPluginBase):
         # primer position columns are populated for all extracted sequences
         self.assertFalse(df['f-primer-start'].isna().any())
         self.assertFalse(df['r-primer-end'].isna().any())
+        self.assertTrue(False, " TODO: Make this test more specific!")
 
     def test_extract_reads_stats_orientation(self):
         results = extract_reads(
@@ -396,6 +397,7 @@ class TestAlignPrimer(FeatureClassifierTestPluginBase):
         result = _align_primer(primer, target, self.sm, reverse=False)
         self.assertEqual(str(target[result.primer_start:result.primer_end]),
                          'AAAA')
+        self.assertTrue(False, "TODO: add diversity to this primer seq")
 
     def test_reverse_primer_start_and_end_in_target(self):
         # rc('GGGG') = CCCC matches the last 4 bases of AAAACCCC
@@ -404,6 +406,7 @@ class TestAlignPrimer(FeatureClassifierTestPluginBase):
         result = _align_primer(primer, target, self.sm, reverse=True)
         self.assertEqual(str(target[result.primer_start:result.primer_end]),
                          'CCCC')
+        self.assertTrue(False, "TODO: add diversity to this primer seq")
 
 
 class TestApproxMatch(FeatureClassifierTestPluginBase):

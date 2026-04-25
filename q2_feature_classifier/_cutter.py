@@ -273,7 +273,7 @@ def _gen_reads(sequence, f_primer, r_primer, trim_right, trunc_len, trim_left,
     if trim_left > 0:
         amp = amp[trim_left:]
 
-    if not amp:
+    if len(amp) == 0:
         stats['outcome'] = 'excluded-empty-after-trim'
         return None, stats
 
