@@ -7,6 +7,7 @@
 # ----------------------------------------------------------------------------
 
 import numpy as np
+import pandas as pd
 import skbio
 import qiime2
 
@@ -233,6 +234,119 @@ class CutterTests(FeatureClassifierTestPluginBase):
         self.assertEqual(stats['outcome'], 'excluded-max-length')
         self.assertEqual(stats['amplicon-length-pre-trim'], 4)
         self.assertIsNone(stats['amplicon-length-post-trim'])
+
+    def test_extract_reads_stats_excluded_primers_out_of_order(self):
+        # Forward primer 'AAAA' aligns at the end of the target and the
+        # reverse primer 'GGGG' (RC = 'CCCC') aligns at the start, so both
+        # primers individually pass the identity threshold but are placed in
+        # reversed order along the sequence. The exact-match regex cannot
+        # match this arrangement, so the approximate path is exercised.
+        from q2_feature_classifier._cutter import _gen_reads
+        seq = skbio.DNA('CCCCTTTTAAAA', metadata={'id': 'test-seq'})
+        amp, stats = _gen_reads(seq, 'AAAA', 'GGGG',
+                                trim_right=0, trunc_len=0, trim_left=0,
+                                identity=0.7, min_length=0, max_length=0,
+                                read_orientation='forward')
+        self.assertIsNone(amp)
+        self.assertEqual(stats['outcome'], 'excluded-primers-out-of-order')
+        self.assertLess(stats['r-primer-start'], stats['f-primer-end'])
+        self.assertIsNone(stats['amplicon-length-pre-trim'])
+        self.assertIsNone(stats['amplicon-length-post-trim'])
+
+    def test_extract_reads_stats_gtdb_subset(self):
+        # Five real GTDB SSU sequences exercised against 27F/338R. This
+        # subset hits every relevant code path: forward+exact,
+        # forward+approximate, reverse+approximate, and (twice) the new
+        # excluded-primers-out-of-order outcome.
+        sequences = Artifact.import_data(
+            'FeatureData[Sequence]',
+            self.get_data_path('dna-sequences-gtdb-subset.fasta'))
+        results = extract_reads(
+            sequences,
+            f_primer='AGRGTTYGATYHTGGCTCAG',
+            r_primer='TGCWGCCWCCCGTAGGWGT',
+            min_length=1)
+        df = results.read_extraction_stats.view(qiime2.Metadata).to_dataframe()
+
+        expected = {
+            'GB_GCA_000380705.1': {
+                'outcome': 'extracted',
+                'match-orientation': 'reverse',
+                'match-method': 'approximate',
+                'f-primer-start': 1.0, 'f-primer-end': 18.0,
+                'r-primer-start': 1264.0, 'r-primer-end': 1280.0,
+                'f-primer-match-pct': 15 / 20,
+                'r-primer-match-pct': 15 / 20,
+                'amplicon-length-pre-trim': 1246.0,
+                'amplicon-length-post-trim': 1246.0,
+                'input-sequence-length': 1490.0,
+            },
+            'GB_GCA_000008085.1': {
+                'outcome': 'excluded-primers-out-of-order',
+                'match-orientation': 'forward',
+                'match-method': 'approximate',
+                'f-primer-start': 1419.0, 'f-primer-end': 1438.0,
+                'r-primer-start': 9.0, 'r-primer-end': 25.0,
+                'f-primer-match-pct': 14 / 20,
+                'r-primer-match-pct': 15 / 19,
+                'amplicon-length-pre-trim': None,
+                'amplicon-length-post-trim': None,
+                'input-sequence-length': 1499.0,
+            },
+            'GB_GCA_000018565.1': {
+                'outcome': 'extracted',
+                'match-orientation': 'forward',
+                'match-method': 'approximate',
+                'f-primer-start': 3.0, 'f-primer-end': 23.0,
+                'r-primer-start': 310.0, 'r-primer-end': 329.0,
+                'f-primer-match-pct': 19 / 20,
+                'r-primer-match-pct': 18 / 19,
+                'amplicon-length-pre-trim': 287.0,
+                'amplicon-length-post-trim': 287.0,
+                'input-sequence-length': 1478.0,
+            },
+            'GB_GCA_000008885.1': {
+                'outcome': 'extracted',
+                'match-orientation': 'forward',
+                'match-method': 'exact',
+                'f-primer-start': 4.0, 'f-primer-end': 24.0,
+                'r-primer-start': 344.0, 'r-primer-end': 363.0,
+                'f-primer-match-pct': 1.0,
+                'r-primer-match-pct': 1.0,
+                'amplicon-length-pre-trim': 320.0,
+                'amplicon-length-post-trim': 320.0,
+                'input-sequence-length': 1547.0,
+            },
+            'GB_GCA_000987045.1': {
+                'outcome': 'excluded-primers-out-of-order',
+                'match-orientation': 'reverse',
+                'match-method': 'approximate',
+                'f-primer-start': 1498.0, 'f-primer-end': 1517.0,
+                'r-primer-start': 1282.0, 'r-primer-end': 1302.0,
+                'f-primer-match-pct': 15 / 20,
+                'r-primer-match-pct': 14 / 20,
+                'amplicon-length-pre-trim': None,
+                'amplicon-length-post-trim': None,
+                'input-sequence-length': 1532.0,
+            },
+        }
+
+        self.assertEqual(set(df.index), set(expected.keys()))
+        for seq_id, expected_stats in expected.items():
+            for col, expected_val in expected_stats.items():
+                actual = df.loc[seq_id, col]
+                if expected_val is None:
+                    self.assertTrue(
+                        pd.isna(actual),
+                        f'{seq_id}.{col}: expected NaN, got {actual!r}')
+                elif isinstance(expected_val, float):
+                    self.assertAlmostEqual(
+                        actual, expected_val, places=6,
+                        msg=f'{seq_id}.{col}')
+                else:
+                    self.assertEqual(
+                        actual, expected_val,
+                        msg=f'{seq_id}.{col}')
 
     def test_extract_reads_stats_no_primer_match(self):
         from q2_feature_classifier._cutter import _gen_reads

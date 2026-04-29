@@ -259,6 +259,14 @@ def _gen_reads(sequence, f_primer, r_primer, trim_right, trunc_len, trim_left,
     if amp is None:
         return None, stats
 
+    # Both primers individually passed identity, but the forward primer
+    # alignment ends after the reverse primer alignment starts. This usually
+    # means the primers aligned in reversed order along the target; an
+    # overlapping (but correctly-ordered) alignment is also caught here.
+    if stats['r-primer-start'] < stats['f-primer-end']:
+        stats['outcome'] = 'excluded-primers-out-of-order'
+        return None, stats
+
     stats['amplicon-length-pre-trim'] = len(amp)
 
     # filter by max length before trimming
