@@ -246,6 +246,40 @@ class CutterTests(FeatureClassifierTestPluginBase):
         self.assertEqual(stats['match-orientation'], 'none')
         self.assertIsNone(stats['f-primer-start'])
 
+    def _assert_gen_reads_rc_symmetry(self, seq_str, expected_method):
+        from q2_feature_classifier._cutter import _gen_reads
+        seq = skbio.DNA(seq_str, metadata={'id': 'test-seq'})
+        rc_seq = seq.reverse_complement()
+
+        amp_fwd, stats_fwd = _gen_reads(
+            seq, self.f_primer, self.r_primer,
+            trim_right=0, trunc_len=0, trim_left=0,
+            identity=0.7, min_length=0, max_length=0,
+            read_orientation='both')
+        amp_rev, stats_rev = _gen_reads(
+            rc_seq, self.f_primer, self.r_primer,
+            trim_right=0, trunc_len=0, trim_left=0,
+            identity=0.7, min_length=0, max_length=0,
+            read_orientation='both')
+
+        self.assertIsNotNone(amp_fwd)
+        self.assertIsNotNone(amp_rev)
+        self.assertEqual(str(amp_fwd), str(amp_rev))
+        self.assertEqual(stats_fwd['match-method'], expected_method)
+        self.assertEqual(stats_rev['match-method'], expected_method)
+        self.assertEqual(stats_fwd['match-orientation'], 'forward')
+        self.assertEqual(stats_rev['match-orientation'], 'reverse')
+
+    def test_gen_reads_rc_symmetry_exact(self):
+        # Trailing 'GCAGC' = RC('GCTGC') is an exact reverse-primer site on
+        # the forward strand, so the exact-match path is exercised.
+        self._assert_gen_reads_rc_symmetry('AGAGAACGTGCAGC', 'exact')
+
+    def test_gen_reads_rc_symmetry_approximate(self):
+        # Trailing 'GCTGC' differs from RC('GCTGC')='GCAGC' at one position,
+        # forcing the approximate-match path (4/5 = 0.8 >= identity=0.7).
+        self._assert_gen_reads_rc_symmetry('AGAGAACGTGCTGC', 'approximate')
+
 
 class TestCreateAsymmetricPrimerSubstitutionMatrix(
         FeatureClassifierTestPluginBase
