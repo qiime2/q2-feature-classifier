@@ -47,17 +47,20 @@ def _primers_to_regex(f_primer, r_primer):
                                _seq_to_regex(r_primer.reverse_complement()))
 
 
-def _exact_match(seq, f_primer, r_primer):
+def _exact_match(seq: skbio.Sequence, f_primer: str, r_primer: str):
+    regex = _primers_to_regex(f_primer, r_primer)
+
     try:
-        regex = _primers_to_regex(f_primer, r_primer)
         match = next(seq.find_with_regex(regex))
-        f_start = match.start
-        f_end = match.start + len(f_primer)
-        r_start = match.stop - len(r_primer)
-        r_end = match.stop
-        return seq[f_end:r_start], f_start, f_end, r_start, r_end
     except StopIteration:
         return None
+
+    f_start = match.start
+    f_end = match.start + len(f_primer)
+    r_start = match.stop - len(r_primer)
+    r_end = match.stop
+
+    return seq[f_end:r_start], f_start, f_end, r_start, r_end
 
 
 def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
