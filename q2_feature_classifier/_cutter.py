@@ -7,7 +7,6 @@
 # ----------------------------------------------------------------------------
 
 import skbio
-import os
 import numpy as np
 import pandas as pd
 import qiime2
@@ -15,6 +14,7 @@ from collections import namedtuple
 from joblib import Parallel, delayed, effective_n_jobs
 
 from qiime2.plugin import Int, Str, Float, Range, Choices
+from qiime2.plugin.util import transform
 from q2_types.feature_data import (FeatureData, Sequence, DNAIterator,
                                    DNASequencesDirectoryFormat, DNAFASTAFormat)
 from q2_types.metadata import ImmutableMetadata, ImmutableMetadataFormat
@@ -27,14 +27,6 @@ from .plugin_setup import plugin
 _AlignResult = namedtuple(
     '_AlignResult',
     ['amplicon_pos', 'match_percent', 'primer_start', 'primer_end'])
-
-_STATS_COLUMNS = [
-    'outcome', 'match-orientation', 'match-method',
-    'f-primer-start', 'f-primer-end', 'r-primer-start', 'r-primer-end',
-    'f-primer-match-pct', 'r-primer-match-pct',
-    'amplicon-length-pre-trim', 'amplicon-length-post-trim',
-    'input-sequence-length',
-]
 
 
 def _seq_to_regex(seq):
@@ -353,35 +345,42 @@ def extract_reads(sequences: DNASequencesDirectoryFormat, f_primer: str,
                          'trim_right).')
 
     n_jobs = effective_n_jobs(n_jobs)
+
     if batch_size == 'auto':
         batch_size = _autotune_reads_per_batch(
             sequences.file.view(DNAFASTAFormat), n_jobs)
+
     sequences = sequences.file.view(DNAIterator)
     ff = DNAFASTAFormat()
+
     all_stats = []
+    no_matches = True
     with open(str(ff), 'a') as fh:
         with Parallel(n_jobs) as parallel:
             for chunk in _chunks(sequences, batch_size):
-                results = parallel(delayed(_gen_reads)(sequence, f_primer,
-                                                       r_primer,
-                                                       trim_right,
-                                                       trunc_len,
-                                                       trim_left,
-                                                       identity,
-                                                       min_length,
-                                                       max_length,
-                                                       read_orientation)
-                                   for sequence in chunk)
+                results = parallel(delayed(_gen_reads)(
+                    sequence, f_primer, r_primer, trim_right, trunc_len,
+                    trim_left, identity, min_length, max_length,
+                    read_orientation
+                ) for sequence in chunk)
+
                 for amplicon, stats in results:
                     all_stats.append(stats)
                     if amplicon is not None:
+                        no_matches = False
                         skbio.write(amplicon, format='fasta', into=fh)
-    if os.stat(str(ff)).st_size == 0:
+
+    if no_matches:
         raise RuntimeError("No matches found")
-    stats_df = pd.DataFrame(all_stats, columns=['id'] + _STATS_COLUMNS)
-    stats_df = stats_df.set_index('id')
-    stats_ff = ImmutableMetadataFormat()
-    qiime2.Metadata(stats_df).save(str(stats_ff))
+
+    stats_df = pd.DataFrame(
+        all_stats, columns=list(all_stats[0].keys())
+    ).set_index('id')
+
+    stats_ff = transform(
+        qiime2.Metadata(stats_df), to_type=ImmutableMetadataFormat
+    )
+
     return ff, stats_ff
 
 
