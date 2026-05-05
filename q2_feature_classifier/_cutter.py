@@ -107,14 +107,10 @@ def _create_asymmetric_primer_substitution_matrix(match=2, mismatch=-3):
     return skbio.SubstitutionMatrix(chars, sm)
 
 
-def _match_percent(primer, target):
-    """ Compute proportion of matching positions in alignments, accounting for
-        primer degeneracies.
-
-        Parameters
-        ----------
-        primer : skbio.DNA
-        target : skbio.DNA
+def _match_percent(primer: skbio.DNA, target: skbio.DNA):
+    """
+    Compute proportion of matching positions in alignments, accounting for
+    primer degeneracies.
     """
     matches = 0
     for primer_c, target_c in zip(str(primer), str(target)):
@@ -128,31 +124,41 @@ def _match_percent(primer, target):
     return matches / len(primer)
 
 
-def _align_primer(primer, target, substitution_matrix, reverse=False):
+def _align_primer(
+    primer: skbio.DNA,
+    target: skbio.DNA,
+    substitution_matrix: skbio.SubstitutionMatrix,
+    reverse=False
+):
+    '''
+    perform pairwise semi-global alignment such that gaps on the
+    ends of primer are free from penalization but gaps on the ends of target
+    are penalized. for example:
+
+    gaps on the ends of the primer, as in the following, are free:
+    --AAAA----------
+    CCAAAAGGGGCCCCTT
+    or
+    ----------CCCC--
+    CCAAAAGGGGCCCCTT
+
+    gaps on the end of the target, as in the following, incur the penalty:
+    AAAA------
+    --AAGGGGCC
+    or
+    ------CCCC
+    AAGGGGCC--
+
+    degenerate characters in primer match the characters they represent,
+    but degenerate characters in target are always considered
+    mismatches
+
+    Note that if `reverse=False` then `amplicon_pos` is the first (5') base
+    of the amplicon, and if `reverse=True` then `amplicon_pos` is one past the
+    last (3') base of the amplicon.
+    '''
     if reverse:
         primer = primer.reverse_complement()
-
-    # perform pairwise semi-global alignment such that gaps on the
-    # ends of primer are free from penalization but gaps on the ends of target
-    # are penalized. for example:
-
-    # gaps on the ends of the primer, as in the following, are free:
-    # --AAAA----------
-    # CCAAAAGGGGCCCCTT
-    # or
-    # ----------CCCC--
-    # CCAAAAGGGGCCCCTT
-
-    # gaps on the end of the target, as in the following, incur the penalty:
-    # AAAA------
-    # --AAGGGGCC
-    # or
-    # ------CCCC
-    # AAGGGGCC--
-
-    # degenerate characters in primer match the characters they represent,
-    # but degenerate characters in target are always considered
-    # mismatches
 
     aln = skbio.alignment.pair_align_nucl(
         primer, target, mode='global', sub_score=substitution_matrix,
