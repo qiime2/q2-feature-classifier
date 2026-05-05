@@ -164,12 +164,6 @@ class CutterTests(FeatureClassifierTestPluginBase):
                 self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
                 trunc_len=1)
 
-    def test_extract_reads_stats_returned(self):
-        results = extract_reads(
-            self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
-            min_length=4)
-        self.assertIsNotNone(results.read_extraction_stats)
-
     def test_extract_reads_stats_schema(self):
         results = extract_reads(
             self.sequences, f_primer=self.f_primer, r_primer=self.r_primer,
@@ -370,6 +364,28 @@ class CutterTests(FeatureClassifierTestPluginBase):
         # forcing the approximate-match path (4/5 = 0.8 >= identity=0.7).
         self._assert_gen_reads_rc_symmetry('AGAGAATTCGTGCTGC', 'approximate',
                                            'ATTCGT')
+
+    def test_extract_reads_seqeuences_and_stats_in_agreement(self):
+        '''
+        Ensure that the number of amplicons is equal to the number of records
+        indicating "extracted" in the stats file.
+        '''
+        for dataset in (
+            self.sequences, self.mixed_sequences, self.mixed_sequences2
+        ):
+            amps, stats = extract_reads(
+                dataset,
+                f_primer=self.f_primer,
+                r_primer=self.r_primer,
+                min_length=0,
+            )
+
+            amps = amps.view(qiime2.Metadata).to_dataframe()
+            stats = stats.view(qiime2.Metadata).to_dataframe()
+
+            self.assertEqual(
+                len(amps), stats['outcome'].value_counts()['extracted']
+            )
 
 
 class TestCreateAsymmetricPrimerSubstitutionMatrix(
