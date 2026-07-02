@@ -208,6 +208,21 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
         for taxon in fc:
             self.assertEqual(fc[taxon], cc[taxon])
 
+    def test_classify_linkedseq(self):
+        # confirm that classification works with sequences containing gaps.
+        # no need to test contents, just make sure the action does not choke.
+        classify = feature_classifier.methods.classify_sklearn
+        seq_data = pd.Series(
+            ['ATTGAACGCTGGCGGCACGCCTAACACATGCAAGTCGAACGGCAGCGGGGGAAAGC'
+             'TTGCTTTCCTGCCGGCGAGTGGCGGACGGGTGAGTAATGCGTAGGAATTTGCCATT'
+             'AAGAGGGGGA CAACTCGGGGAAACTCGAGCTAATACCA',
+             'ATTGAACGCTG CGGCACGCCTAACACATGCAAGTCGAACGGCAGCGGGGGAAAGC'
+             'TTGCTT CCTGCCGGCGAGTGG GGACGGGTGAGTAATGCGTAGGAAT TGCCATT'
+             'AAGAGGGGGA CAACTCGGGGAAACTCGAGCTAATACCA'], index=['s1', 's2'])
+        reads = Artifact.import_data('FeatureData[LinkedSequence]', seq_data)
+        result = classify(reads, self.classifier,
+                          read_orientation='auto')
+
     def test_unassigned_taxa(self):
         # classifications that don't meet the threshold should be "Unassigned"
         classify = feature_classifier.methods.classify_sklearn
