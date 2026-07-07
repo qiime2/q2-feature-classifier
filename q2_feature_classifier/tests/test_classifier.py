@@ -220,8 +220,7 @@ class ClassifierTests(FeatureClassifierTestPluginBase):
              'TTGCTT CCTGCCGGCGAGTGG GGACGGGTGAGTAATGCGTAGGAAT TGCCATT'
              'AAGAGGGGGA CAACTCGGGGAAACTCGAGCTAATACCA'], index=['s1', 's2'])
         reads = Artifact.import_data('FeatureData[LinkedSequence]', seq_data)
-        result = classify(reads, self.classifier,
-                          read_orientation='auto')
+        classify(reads, self.classifier, read_orientation='auto')
 
     def test_unassigned_taxa(self):
         # classifications that don't meet the threshold should be "Unassigned"
