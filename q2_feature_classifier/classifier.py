@@ -18,7 +18,8 @@ from qiime2.plugin import (
     Int, Str, Float, Bool, Choices, Range, Threads, get_available_cores
 )
 from q2_types.feature_data import (
-    FeatureData, Taxonomy, Sequence, DNAIterator, DNAFASTAFormat)
+    FeatureData, Taxonomy, Sequence, DNAIterator, LinkedSequence, LinkedDNA,
+    FASTAFormat)
 from q2_types.feature_table import FeatureTable, RelativeFrequency
 from sklearn.pipeline import Pipeline
 import sklearn
@@ -204,7 +205,7 @@ def _autotune_reads_per_batch(reads, n_jobs):
         return 20000
 
 
-def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
+def classify_sklearn(reads: FASTAFormat, classifier: Pipeline,
                      reads_per_batch: int = 'auto', n_jobs: int = 1,
                      pre_dispatch: str = '2*n_jobs', confidence: float = 0.7,
                      read_orientation: str = 'auto'
@@ -220,7 +221,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
 
         # transform reads to DNAIterator
         reads_iter = DNAIterator(
-            skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
+            skbio.read(str(reads), format='fasta', constructor=LinkedDNA))
         reads_iter = _autodetect_orientation(
             reads_iter, classifier, read_orientation=read_orientation)
 
@@ -234,7 +235,7 @@ def classify_sklearn(reads: DNAFASTAFormat, classifier: Pipeline,
                 confidence=confidence
             )
             reads_reverse_iter = DNAIterator(
-                skbio.read(str(reads), format='fasta', constructor=skbio.DNA))
+                skbio.read(str(reads), format='fasta', constructor=LinkedDNA))
             reverse_comp_predict = predict(
                 (r.reverse_complement() for r in reads_reverse_iter),
                 classifier,
@@ -354,7 +355,7 @@ _parameter_descriptions = {
 
 plugin.methods.register_function(
     function=classify_sklearn,
-    inputs={'reads': FeatureData[Sequence],
+    inputs={'reads': FeatureData[Sequence | LinkedSequence],
             'classifier': TaxonomicClassifier},
     parameters=_classify_parameters,
     outputs=[('classification', FeatureData[Taxonomy])],
