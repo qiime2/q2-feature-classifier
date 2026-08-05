@@ -191,7 +191,7 @@ def classify_hybrid_vsearch_sklearn(ctx,
     # filter out unassigned seqs
     try:
         query, = filter_seqs(sequences=query, taxonomy=taxa1,
-                             include=DEFAULTUNASSIGNABLELABEL)
+                             include=[DEFAULTUNASSIGNABLELABEL])
     except ValueError:
         # get ValueError if all sequences are filtered out.
         # so if no sequences are unassigned, return exact match results
